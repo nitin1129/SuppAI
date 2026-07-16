@@ -9,7 +9,6 @@ import {
   Star,
   Users2,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/shell/BrandMark";
@@ -18,7 +17,6 @@ import { doctorSignIn } from "@/lib/partner/auth";
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 export default function DoctorLoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,7 +26,7 @@ export default function DoctorLoginPage() {
     setBusy(true);
     try {
       await doctorSignIn(username, password);
-      router.push("/doctor");
+      window.location.assign("/doctor");
     } finally {
       setBusy(false);
     }

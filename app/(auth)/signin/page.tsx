@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { AuthField } from "@/components/auth/AuthField";
 import { BrandSide } from "@/components/auth/BrandSide";
@@ -11,11 +10,9 @@ import { healthTaglines } from "@/lib/health-taglines";
 import { wellnessTips } from "@/lib/wellness-tips";
 
 export default function SignInPage() {
-  const router = useRouter();
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    router.push("/dashboard");
+    window.location.assign("/dashboard");
   }
 
   return (

@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import { ArrowRight, Lock, Sparkles, Star, Store } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/shell/BrandMark";
@@ -11,7 +10,6 @@ import { vendorSignIn } from "@/lib/partner/auth";
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 export default function VendorLoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -21,7 +19,7 @@ export default function VendorLoginPage() {
     setBusy(true);
     try {
       await vendorSignIn(username, password);
-      router.push("/vendor");
+      window.location.assign("/vendor");
     } finally {
       setBusy(false);
     }

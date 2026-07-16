@@ -2,7 +2,6 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Lock, Mail } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/shell/BrandMark";
@@ -11,7 +10,6 @@ import { signIn } from "@/lib/admin/auth";
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const reduce = useReducedMotion();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +22,9 @@ export default function AdminLoginPage() {
     setBusy(true);
     try {
       await signIn(email.trim(), password);
-      router.replace("/admin");
+      // Full navigation so the admin layout re-reads the freshly-written session
+      // instead of its stale (pre-login) copy, which would bounce back to login.
+      window.location.assign("/admin");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");
       setBusy(false);
@@ -127,8 +127,8 @@ export default function AdminLoginPage() {
           </motion.p>
 
           <motion.form {...rise(0.24)} onSubmit={onSubmit} className="mt-6 space-y-4">
-            <Field id="email" label="Work email" icon={Mail} type="email" value={email} onChange={setEmail} placeholder="you@suppai.health" autoComplete="email" />
-            <Field id="password" label="Password" icon={Lock} type="password" value={password} onChange={setPassword} placeholder="At least 4 characters" autoComplete="current-password" />
+            <Field id="email" label="Work email" icon={Mail} type="text" value={email} onChange={setEmail} placeholder="you@suppai.health" autoComplete="email" />
+            <Field id="password" label="Password" icon={Lock} type="text" value={password} onChange={setPassword} placeholder="At least 4 characters" autoComplete="off" />
 
             {error && (
               <p role="alert" className="rounded-lg bg-[#c14040]/8 px-3 py-2 text-[11.5px] font-medium text-[#c14040] ring-1 ring-[#c14040]/20">{error}</p>

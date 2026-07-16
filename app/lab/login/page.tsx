@@ -11,7 +11,6 @@ import {
   TrendingUp,
   Users2,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/shell/BrandMark";
@@ -20,7 +19,6 @@ import { labSignIn } from "@/lib/partner/auth";
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 export default function LabLoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -30,7 +28,7 @@ export default function LabLoginPage() {
     setBusy(true);
     try {
       await labSignIn(username, password);
-      router.push("/lab");
+      window.location.assign("/lab");
     } finally {
       setBusy(false);
     }
