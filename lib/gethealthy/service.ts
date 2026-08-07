@@ -126,6 +126,12 @@ export async function removeDayBlock(id: string): Promise<DayBlock[]> {
   return delay(next, 140);
 }
 
+export async function updateDayBlock(id: string, patch: Partial<Omit<DayBlock, "id">>): Promise<DayBlock[]> {
+  const next = readLocal(LS_DAY, DAY_PLAN).map((b) => (b.id === id ? { ...b, ...patch } : b)).sort(byTime);
+  writeLocal(LS_DAY, next);
+  return delay(next, 150);
+}
+
 /* ------------------------------ weekly plan ------------------------------ */
 
 export type WeekDay = {

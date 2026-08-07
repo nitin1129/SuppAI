@@ -17,7 +17,9 @@ import {
   FileText,
   Flame,
   Lock,
+  Minus,
   Moon,
+  Pencil,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -34,6 +36,7 @@ import {
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { HealthTools } from "@/components/dashboard/HealthTools";
 import {
   DAY_CALORIE_TARGET,
   RECIPES,
@@ -56,7 +59,9 @@ import {
   removeRoutineItem,
   resetPlan,
   toggleDone,
+  updateDayBlock,
 } from "@/lib/gethealthy/service";
+import { FOODS, findFood } from "@/lib/gethealthy/foods";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const CARD = "rounded-3xl bg-white shadow-[0_2px_4px_-2px_rgba(15,58,38,0.08),0_16px_36px_-20px_rgba(15,58,38,0.30)] ring-1 ring-[#0f3a26]/10";
@@ -148,6 +153,7 @@ export function GetHealthyHome() {
   const [proc, setProc] = useState<{ active: boolean; step: number }>({ active: false, step: 0 });
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [add, setAdd] = useState<AddInit | null>(null);
+  const [editMeal, setEditMeal] = useState<DayBlock | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const reduce = useReducedMotion();
 
@@ -189,6 +195,7 @@ export function GetHealthyHome() {
           onToggle={async (id) => setDoneIds(await toggleDone(id))}
           onRemoveBlock={async (id) => setBlocks(await removeDayBlock(id))}
           onRemoveRoutine={async (id) => setRoutine(await removeRoutineItem(id))}
+          onEditMeal={(b) => setEditMeal(b)}
           onOpenRecipe={setRecipe}
           onAdd={(init) => setAdd(init)}
           onBrowse={browse}
@@ -213,6 +220,8 @@ export function GetHealthyHome() {
           setAdd(null);
         }}
       />
+
+      <MealEditor block={editMeal} onClose={() => setEditMeal(null)} onSave={async (id, patch) => { setBlocks(await updateDayBlock(id, patch)); setEditMeal(null); }} />
     </div>
   );
 }
@@ -252,7 +261,9 @@ function EmptyPlan({ onBrowse, onFile, onSample, onOpenRecipe }: { onBrowse: () 
           <LockedMini title="Weekly plan" body="Seven days of training and nutrition, tuned to your markers." onUpload={onBrowse} icon={CheckCircle2} />
         </div>
       </Stagger>
-      <Stagger i={2}>
+      <Stagger i={2}><HealthTools /></Stagger>
+
+      <Stagger i={3}>
         <Heading label="Eat well" title="Recipes for you" action={<span className="text-[11px] text-[#0f3a26]/40">scroll for more</span>} />
         <RecipeRail onOpen={onOpenRecipe} />
       </Stagger>
@@ -362,10 +373,11 @@ function ProcessingCard({ step }: { step: number }) {
 function ActivePlan(props: {
   state: PlanState; doneIds: string[]; blocks: DayBlock[]; routine: RoutineItem[]; ach: Achievements | null;
   onToggle: (id: string) => void; onRemoveBlock: (id: string) => void; onRemoveRoutine: (id: string) => void;
+  onEditMeal: (b: DayBlock) => void;
   onOpenRecipe: (r: Recipe) => void; onAdd: (init: AddInit) => void; onBrowse: () => void; onReset: () => void;
   onDownloadDay: () => void; onDownloadWeek: () => void;
 }) {
-  const { state, doneIds, blocks, routine, ach, onToggle, onRemoveBlock, onRemoveRoutine, onOpenRecipe, onAdd, onBrowse, onReset, onDownloadDay, onDownloadWeek } = props;
+  const { state, doneIds, blocks, routine, ach, onToggle, onRemoveBlock, onRemoveRoutine, onEditMeal, onOpenRecipe, onAdd, onBrowse, onReset, onDownloadDay, onDownloadWeek } = props;
   const todayKey = WEEK_PLAN[Math.min(Math.max(state.day - 1, 0), WEEK_PLAN.length - 1)].key;
   const doneCount = blocks.filter((b) => doneIds.includes(b.id)).length;
 
@@ -388,7 +400,7 @@ function ActivePlan(props: {
                   <button onClick={() => onAdd({ mode: "today", day: todayKey })} className="inline-flex items-center gap-1.5 rounded-lg bg-[#006E42] px-2.5 py-1.5 text-[11.5px] font-semibold text-white transition hover:bg-[#005634]"><Plus className="h-3.5 w-3.5" />Add</button>
                 </div>
               </div>
-              <DayTimeline blocks={blocks} doneIds={doneIds} onToggle={onToggle} onRemove={onRemoveBlock} />
+              <DayTimeline blocks={blocks} doneIds={doneIds} onToggle={onToggle} onRemove={onRemoveBlock} onEdit={onEditMeal} />
               <DaySummaryFooter blocks={blocks} />
             </div>
           </div>
@@ -401,7 +413,9 @@ function ActivePlan(props: {
         </div>
       </Stagger>
 
-      <Stagger i={2}>
+      <Stagger i={2}><HealthTools /></Stagger>
+
+      <Stagger i={3}>
         <Heading label="Eat well" title="Recipes for you" action={<span className="text-[11px] text-[#0f3a26]/40">scroll for more</span>} />
         <RecipeRail onOpen={onOpenRecipe} />
       </Stagger>
@@ -434,7 +448,7 @@ function ActiveHeader({ state, onAdd, onBrowse, onReset }: { state: PlanState; o
   );
 }
 
-function DayTimeline({ blocks, doneIds, onToggle, onRemove }: { blocks: DayBlock[]; doneIds: string[]; onToggle: (id: string) => void; onRemove: (id: string) => void }) {
+function DayTimeline({ blocks, doneIds, onToggle, onRemove, onEdit }: { blocks: DayBlock[]; doneIds: string[]; onToggle: (id: string) => void; onRemove: (id: string) => void; onEdit: (b: DayBlock) => void }) {
   const reduce = useReducedMotion();
   if (blocks.length === 0) return <p className="rounded-2xl bg-[#f1f7f3] p-8 text-center text-[12.5px] text-[#0f3a26]/55 ring-1 ring-inset ring-[#0f3a26]/[0.08]">No blocks left. Use Add to build your day.</p>;
   const groups = DAY_PARTS.map((p) => ({ ...p, items: blocks.filter((b) => partOfDay(b.time) === p.key) })).filter((g) => g.items.length);
@@ -454,7 +468,7 @@ function DayTimeline({ blocks, doneIds, onToggle, onRemove }: { blocks: DayBlock
             <ul className="space-y-2">
               <AnimatePresence initial={false}>
                 {g.items.map((b) => (
-                  <BlockRow key={b.id} b={b} done={doneIds.includes(b.id)} onToggle={onToggle} onRemove={onRemove} reduce={!!reduce} />
+                  <BlockRow key={b.id} b={b} done={doneIds.includes(b.id)} onToggle={onToggle} onRemove={onRemove} onEdit={onEdit} reduce={!!reduce} />
                 ))}
               </AnimatePresence>
             </ul>
@@ -465,10 +479,11 @@ function DayTimeline({ blocks, doneIds, onToggle, onRemove }: { blocks: DayBlock
   );
 }
 
-function BlockRow({ b, done, onToggle, onRemove, reduce }: { b: DayBlock; done: boolean; onToggle: (id: string) => void; onRemove: (id: string) => void; reduce: boolean }) {
+function BlockRow({ b, done, onToggle, onRemove, onEdit, reduce }: { b: DayBlock; done: boolean; onToggle: (id: string) => void; onRemove: (id: string) => void; onEdit: (b: DayBlock) => void; reduce: boolean }) {
   const meta = BLOCK_META[b.type];
+  const editable = b.type === "meal" || b.type === "snack";
   return (
-    <motion.li layout initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.28, ease: EASE }} className="flex items-stretch gap-2">
+    <motion.li layout initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.28, ease: EASE }} className="flex items-center gap-2">
       <button onClick={() => onToggle(b.id)} className={`flex flex-1 items-center gap-3 rounded-2xl p-3 text-left ring-1 ring-inset transition ${done ? "bg-[#006E42]/[0.05] ring-[#006E42]/15" : "bg-[#f1f7f3] ring-[#0f3a26]/[0.08] hover:ring-[#006E42]/25 hover:shadow-[0_6px_16px_-10px_rgba(15,58,38,0.28)]"}`}>
         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-colors ${done ? "bg-[#006E42] text-white" : meta.tint}`}>{done ? <Check className="h-4 w-4" /> : <meta.icon className="h-4 w-4" />}</span>
         <div className="min-w-0 flex-1">
@@ -479,9 +494,12 @@ function BlockRow({ b, done, onToggle, onRemove, reduce }: { b: DayBlock; done: 
           </div>
           <p className="mt-0.5 truncate text-[11px] text-[#0f3a26]/55">{b.detail || TYPE_LABEL[b.type]}{b.kcal ? ` · ${b.kcal} kcal` : ""}</p>
         </div>
-        <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition ${done ? "border-[#006E42] bg-[#006E42] text-white" : "border-[#0f3a26]/20 text-transparent"}`}><Check className="h-3.5 w-3.5" /></span>
       </button>
-      <button onClick={() => onRemove(b.id)} aria-label="Remove block" className="grid w-9 shrink-0 place-items-center rounded-xl text-[#0f3a26]/30 transition hover:bg-[#c14040]/8 hover:text-[#c14040]"><Trash2 className="h-4 w-4" /></button>
+      <div className="flex shrink-0 items-center gap-1">
+        <button onClick={() => onToggle(b.id)} aria-label={done ? "Mark not done" : "Mark done"} className={`grid h-8 w-8 place-items-center rounded-full border-2 transition ${done ? "border-[#006E42] bg-[#006E42] text-white" : "border-[#0f3a26]/20 text-transparent hover:border-[#006E42]/40"}`}><Check className="h-4 w-4" /></button>
+        {editable && <button onClick={() => onEdit(b)} aria-label="Adjust meal" className="grid h-8 w-8 place-items-center rounded-lg text-[#0f3a26]/35 transition hover:bg-[#006E42]/8 hover:text-[#006E42]"><Pencil className="h-3.5 w-3.5" /></button>}
+        <button onClick={() => onRemove(b.id)} aria-label="Remove block" className="grid h-8 w-8 place-items-center rounded-lg text-[#0f3a26]/30 transition hover:bg-[#c14040]/8 hover:text-[#c14040]"><Trash2 className="h-3.5 w-3.5" /></button>
+      </div>
     </motion.li>
   );
 }
@@ -926,6 +944,93 @@ function AddEventModal({ init, onClose, onAddDay, onAddRoutine }: { init: AddIni
             <p className="mt-2 text-[11px] text-[#0f3a26]/50">{mode === "today" ? "Adds this to today&apos;s plan only." : `Repeats every week on ${days.length || "the"} selected day${days.length === 1 ? "" : "s"}.`}</p>
 
             <button onClick={save} disabled={!valid} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006E42] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#005634] disabled:opacity-45"><Plus className="h-4 w-4" />{mode === "today" ? "Add to today" : "Add to routine"}</button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ============================== Meal editor ============================== */
+
+function parseMeal(detail?: string): { name: string; grams: string } {
+  const grams = /(\d+)\s*g/.exec(detail || "")?.[1] ?? "100";
+  const namePart = (detail || "").split("·")[0].trim();
+  const food = findFood(namePart);
+  return { name: food ? food.name : "", grams };
+}
+
+function MealEditor({ block, onClose, onSave }: { block: DayBlock | null; onClose: () => void; onSave: (id: string, patch: Partial<Omit<DayBlock, "id">>) => void }) {
+  const reduce = useReducedMotion();
+  const [name, setName] = useState("");
+  const [grams, setGrams] = useState("100");
+
+  useEffect(() => {
+    if (!block) return;
+    const p = parseMeal(block.detail);
+    setName(p.name);
+    setGrams(p.grams);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
+  }, [block, onClose]);
+
+  const matched = findFood(name);
+  const g = Number(grams) || 0;
+  const kcal = matched && g > 0 ? Math.round((matched.kcal * g) / 100) : 0;
+  const canSave = !!matched && g > 0;
+  const bump = (d: number) => setGrams((cur) => String(Math.max(0, (Number(cur) || 0) + d)));
+
+  function save() {
+    if (!block || !canSave || !matched) return;
+    onSave(block.id, { type: block.type === "snack" ? "snack" : "meal", detail: `${matched.name} · ${g} g`, kcal });
+  }
+
+  return (
+    <AnimatePresence>
+      {block && (
+        <motion.div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+          <div className="absolute inset-0 bg-[#0f3a26]/45" onClick={onClose} aria-hidden />
+          <motion.div role="dialog" aria-modal="true" aria-label="Adjust meal" className={`relative w-full max-w-md ${CARD} p-5`} initial={reduce ? false : { opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }} transition={{ duration: 0.3, ease: EASE }}>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-[16px] font-bold tracking-tight text-[#0f3a26]">Adjust {block.title || "meal"}</h2>
+                <p className="text-[11.5px] text-[#0f3a26]/55">Change the food and quantity, calories update automatically.</p>
+              </div>
+              <button onClick={onClose} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-lg text-[#0f3a26]/50 transition hover:bg-[#0f3a26]/6 hover:text-[#0f3a26]"><X className="h-4 w-4" /></button>
+            </div>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] font-semibold text-[#0f3a26]/60">Food</span>
+              <input list="meal-food-list" value={name} onChange={(e) => setName(e.target.value)} placeholder="Search a food…" className="w-full rounded-xl border border-[#0f3a26]/12 bg-[#f6faf7] px-3.5 py-2.5 text-[14px] text-[#0f3a26] placeholder:text-[#0f3a26]/30 focus:border-[#006E42]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#006E42]/15" />
+              <datalist id="meal-food-list">{FOODS.map((f) => <option key={f.name} value={f.name} />)}</datalist>
+            </label>
+
+            <div className="mt-3">
+              <span className="mb-1.5 block text-[11px] font-semibold text-[#0f3a26]/60">Quantity</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => bump(-25)} aria-label="Less" className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-[#f1f7f3] text-[#0f3a26]/70 ring-1 ring-inset ring-[#0f3a26]/[0.08] transition hover:text-[#006E42]"><Minus className="h-4 w-4" /></button>
+                <div className="relative flex-1">
+                  <input value={grams} onChange={(e) => setGrams(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" className="w-full rounded-xl border border-[#0f3a26]/12 bg-[#f6faf7] px-3.5 py-2.5 text-center text-[15px] font-semibold text-[#0f3a26] focus:border-[#006E42]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#006E42]/15" />
+                  <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11.5px] font-medium text-[#0f3a26]/40">g</span>
+                </div>
+                <button onClick={() => bump(25)} aria-label="More" className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-[#f1f7f3] text-[#0f3a26]/70 ring-1 ring-inset ring-[#0f3a26]/[0.08] transition hover:text-[#006E42]"><Plus className="h-4 w-4" /></button>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[50, 100, 150, 200].map((q) => (
+                  <button key={q} onClick={() => setGrams(String(q))} className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${g === q ? "bg-[#006E42] text-white" : "bg-[#f1f7f3] text-[#0f3a26]/60 ring-1 ring-inset ring-[#0f3a26]/[0.08]"}`}>{q}g</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#006E42]/[0.07] px-4 py-3 ring-1 ring-inset ring-[#006E42]/15">
+              <span className="text-[12.5px] font-semibold text-[#0f3a26]">{matched ? matched.name : "Pick a food"}</span>
+              <span className="inline-flex items-center gap-1 text-[18px] font-bold tabular-nums text-[#006E42]"><Flame className="h-4 w-4 text-[#c79a3d]" />{kcal} kcal</span>
+            </div>
+
+            <button onClick={save} disabled={!canSave} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006E42] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#005634] disabled:opacity-45"><Check className="h-4 w-4" />Save meal</button>
+            {name && !matched && <p className="mt-2 text-center text-[11px] text-[#c14040]">Pick a food from the suggestions to set calories.</p>}
           </motion.div>
         </motion.div>
       )}
