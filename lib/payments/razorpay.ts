@@ -1,28 +1,15 @@
 "use client";
 
-/* Razorpay Checkout integration for the Get Healthy meal plans.
+/* Razorpay Checkout integration for the SuppAI Pro plans.
 
-   ========================= EDIT THESE ==========================
-   1. Paste your Razorpay Key ID (Dashboard -> Settings -> API Keys).
-      It looks like rzp_test_XXXX (test mode) or rzp_live_XXXX (live).
-   2. Set the real price of each plan in rupees.
-   Until a real Key ID is set, the checkout runs in demo mode: it skips
-   the real Razorpay popup and simulates a successful payment so the
-   full flow (confirm -> paid -> plan activates) can be seen.
-   =============================================================== */
+   The Key ID comes from the environment:
+     NEXT_PUBLIC_RAZORPAY_KEY_ID   (set it in .env.local, see .env.example)
+   Plan prices come from the existing plans, so nothing else to set.
+   When the Key ID is missing, checkout runs in demo mode: it skips the
+   real Razorpay popup and simulates a successful payment so the full flow
+   (confirm -> paid -> plan active) can be seen. */
 
-export const RAZORPAY_KEY_ID = "rzp_test_XXXXXXXXXXXXXX";
-
-export const PLAN_PRICE_INR = {
-  daily: 149,
-  weekly: 799,
-};
-
-/* The hosted payment links, kept for reference / fallback. */
-export const PLAN_LINKS = {
-  daily: "https://rzp.io/rzp/biwqJVEj",
-  weekly: "https://rzp.io/rzp/9nX71hi",
-};
+export const RAZORPAY_KEY_ID = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "";
 
 export function isRazorpayConfigured(): boolean {
   return /^rzp_(test|live)_/.test(RAZORPAY_KEY_ID) && !RAZORPAY_KEY_ID.includes("XXXX");

@@ -5,8 +5,10 @@ Next.js 16 app, run as a Node process behind Nginx.
 ## 0. What this app needs
 
 - **Node.js 20.9+** (22 LTS recommended, see `.nvmrc`)
-- No database and no API keys. All demo data lives in the browser's
-  `localStorage`, so there is nothing to provision server side.
+- No database. All demo data lives in the browser's `localStorage`, so there
+  is nothing to provision server side.
+- **One env value**: the Razorpay Key ID (`NEXT_PUBLIC_RAZORPAY_KEY_ID`),
+  set before the build (see step 3). It is a public identifier, not a secret.
 - `sharp` is installed for `next/image` optimisation in production.
 
 ## 1. Prepare the VPS (Ubuntu)
@@ -38,17 +40,29 @@ git clone https://github.com/nitin1129/SuppAI.git
 cd SuppAI
 ```
 
-## 3. Install and build
+## 3. Set the environment
+
+`.env.local` is gitignored, so it is not in the clone. Create it on the server
+before building (`NEXT_PUBLIC_` values are inlined at build time):
+
+```bash
+cp .env.example .env.local
+nano .env.local      # set NEXT_PUBLIC_RAZORPAY_KEY_ID to your rzp_live_... key
+```
+
+Without it, the plan checkout falls back to demo mode (no real charge).
+
+## 4. Install and build
 
 ```bash
 npm ci          # clean install from package-lock.json
-npm run build   # production build
+npm run build   # production build (reads .env.local)
 ```
 
 `npm ci` needs the dev dependencies to build, so do **not** use `--omit=dev`
 before the build. You can prune afterwards with `npm prune --omit=dev`.
 
-## 4. Start with PM2
+## 5. Start with PM2
 
 ```bash
 mkdir -p logs
@@ -67,7 +81,7 @@ pm2 logs suppai
 pm2 reload suppai      # zero-downtime restart
 ```
 
-## 5. Nginx reverse proxy
+## 6. Nginx reverse proxy
 
 Create `/etc/nginx/sites-available/suppai`:
 
@@ -108,12 +122,12 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-## 6. Point the domain
+## 7. Point the domain
 
 In hPanel > Domains > DNS, add an **A record** for `@` (and `www`) pointing to
 the VPS IP. Wait for propagation, then check `http://your-domain.com`.
 
-## 7. HTTPS
+## 8. HTTPS
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
@@ -122,7 +136,7 @@ sudo certbot --nginx -d your-domain.com -d www.your-domain.com
 
 Certbot rewrites the Nginx config for TLS and sets up auto-renewal.
 
-## 8. Firewall
+## 9. Firewall
 
 ```bash
 sudo ufw allow OpenSSH

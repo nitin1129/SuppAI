@@ -1,12 +1,14 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
   Check,
+  CheckCircle2,
   Crown,
   FileText,
   Plus,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -15,7 +17,9 @@ import { useEffect, useState } from "react";
 import { useBooking, type TierId } from "../booking/BookingContext";
 import { fetchProPlans } from "@/lib/plans/service";
 import type { ProPlan } from "@/lib/plans/types";
-import type { ProPlanOrder } from "@/lib/booking/order";
+import { isRazorpayConfigured, openRazorpay } from "@/lib/payments/razorpay";
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Props = {
   onStartInsurance: () => void;
@@ -28,10 +32,13 @@ const FREE_FEATURES = [
 ];
 
 export function PlansHub({ onStartInsurance }: Props) {
-  const { currentTier, activeInsurance, checkout, setActiveInsurance } =
+  const { currentTier, activeInsurance, setActiveInsurance, setCurrentTier } =
     useBooking();
   const [plans, setPlans] = useState<ProPlan[] | null>(null);
   const [activeId, setActiveId] = useState<ProPlan["id"]>("weekly");
+  const [buyPlan, setBuyPlan] = useState<ProPlan | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [paid, setPaid] = useState<{ plan: ProPlan; paymentId: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -41,18 +48,32 @@ export function PlansHub({ onStartInsurance }: Props) {
     };
   }, []);
 
-  function startProCheckout(plan: ProPlan) {
-    const subtotal = plan.price;
-    const gst = Math.round(subtotal * 0.18);
-    const order: ProPlanOrder = {
-      kind: "pro-plan",
-      reference: `SA-PRO-${plan.id.slice(0, 3).toUpperCase()}`,
-      plan,
-      subtotal,
-      gst,
-      total: subtotal + gst,
+  async function payNow(plan: ProPlan) {
+    setPaying(true);
+    const onOk = (paymentId: string) => {
+      setCurrentTier(plan.id);
+      setBuyPlan(null);
+      setPaying(false);
+      setPaid({ plan, paymentId });
     };
-    checkout(order);
+    // Demo mode until a real Razorpay Key ID is set: skip the popup, simulate success.
+    if (!isRazorpayConfigured()) {
+      await wait(700);
+      onOk(`demo_${Date.now()}`);
+      return;
+    }
+    try {
+      await openRazorpay({
+        amountPaise: plan.price * 100,
+        name: "SuppAI",
+        description: `SuppAI Pro, ${plan.label}`,
+        notes: { plan: plan.id },
+        onSuccess: (id) => onOk(id),
+        onDismiss: () => setPaying(false),
+      });
+    } catch {
+      setPaying(false);
+    }
   }
 
   const tierMeta: Record<
@@ -202,7 +223,7 @@ export function PlansHub({ onStartInsurance }: Props) {
               isCurrent={currentTier === plan.id}
               onSelect={() => {
                 setActiveId(plan.id);
-                startProCheckout(plan);
+                setBuyPlan(plan);
               }}
               delay={i * 0.06}
             />
@@ -275,7 +296,83 @@ export function PlansHub({ onStartInsurance }: Props) {
           <ArrowRight className="relative h-5 w-5 shrink-0 text-white transition group-hover:translate-x-0.5" />
         </motion.button>
       )}
+
+      <ProPayModal plan={buyPlan} paying={paying} onClose={() => { if (!paying) setBuyPlan(null); }} onConfirm={payNow} />
+      <ProPaidModal info={paid} onClose={() => setPaid(null)} />
     </div>
+  );
+}
+
+function ProPayModal({ plan, paying, onClose, onConfirm }: { plan: ProPlan | null; paying: boolean; onClose: () => void; onConfirm: (p: ProPlan) => void }) {
+  const reduce = useReducedMotion();
+  useEffect(() => {
+    if (!plan) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !paying) onClose(); };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
+  }, [plan, paying, onClose]);
+
+  const demo = !isRazorpayConfigured();
+
+  return (
+    <AnimatePresence>
+      {plan && (
+        <motion.div className="fixed inset-0 z-[70] flex items-end justify-center p-4 sm:items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+          <div className="absolute inset-0 bg-[#0f3a26]/50" onClick={() => !paying && onClose()} aria-hidden />
+          <motion.div role="dialog" aria-modal="true" aria-label="Confirm plan" className="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-[0_2px_4px_-2px_rgba(15,58,38,0.06),0_16px_36px_-20px_rgba(15,58,38,0.28)] ring-1 ring-[#0f3a26]/10" initial={reduce ? false : { opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+            <div className="flex items-center gap-1.5 text-[#006E42]"><ShieldCheck className="h-4 w-4" /><span className="text-[11px] font-semibold uppercase tracking-[0.14em]">Secure checkout</span></div>
+            <h2 className="mt-2 text-[18px] font-bold tracking-tight text-[#0f3a26]">Confirm your plan</h2>
+            <p className="text-[12.5px] text-[#0f3a26]/60">Continue to payment. No cart, no extra steps.</p>
+
+            <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#f1f7f3] p-4 ring-1 ring-inset ring-[#0f3a26]/[0.06]">
+              <div>
+                <p className="text-[13.5px] font-bold text-[#0f3a26]">SuppAI Pro, {plan.label}</p>
+                <p className="text-[11.5px] text-[#0f3a26]/55">{plan.blurb}</p>
+              </div>
+              <p className="text-[22px] font-bold tabular-nums text-[#0f3a26]">₹{plan.price}</p>
+            </div>
+
+            {demo && <p className="mt-3 rounded-xl bg-[#c79a3d]/12 px-3 py-2 text-[11px] font-medium leading-snug text-[#9c7426]">Demo mode: no real charge. Add your Razorpay Key ID in lib/payments/razorpay.ts to take live payments.</p>}
+
+            <div className="mt-5 flex items-center gap-2">
+              <button onClick={() => !paying && onClose()} disabled={paying} className="rounded-xl px-4 py-2.5 text-[13px] font-medium text-[#0f3a26]/60 transition hover:text-[#0f3a26] disabled:opacity-40">Cancel</button>
+              <button onClick={() => onConfirm(plan)} disabled={paying} className="ml-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#006E42] px-5 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#005634] disabled:opacity-60">
+                {paying ? <><RefreshCw className="h-4 w-4 animate-spin" />Processing</> : <>Confirm and pay ₹{plan.price}</>}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function ProPaidModal({ info, onClose }: { info: { plan: ProPlan; paymentId: string } | null; onClose: () => void }) {
+  const reduce = useReducedMotion();
+  useEffect(() => {
+    if (!info) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
+  }, [info, onClose]);
+
+  return (
+    <AnimatePresence>
+      {info && (
+        <motion.div className="fixed inset-0 z-[70] flex items-end justify-center p-4 sm:items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+          <div className="absolute inset-0 bg-[#0f3a26]/50" onClick={onClose} aria-hidden />
+          <motion.div role="dialog" aria-modal="true" aria-label="Payment successful" className="relative w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-[0_2px_4px_-2px_rgba(15,58,38,0.06),0_16px_36px_-20px_rgba(15,58,38,0.28)] ring-1 ring-[#0f3a26]/10" initial={reduce ? false : { opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+            <motion.span initial={reduce ? false : { scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#006E42]/12 text-[#006E42]"><CheckCircle2 className="h-9 w-9" /></motion.span>
+            <h2 className="mt-4 text-[19px] font-bold tracking-tight text-[#0f3a26]">Payment successful</h2>
+            <p className="mt-1 text-[13px] leading-relaxed text-[#0f3a26]/65">You paid <span className="font-semibold text-[#0f3a26]">₹{info.plan.price}</span> and you&apos;re now on the {info.plan.label} Pro plan.</p>
+            <p className="mx-auto mt-3 inline-block rounded-lg bg-[#f1f7f3] px-3 py-1.5 text-[10.5px] font-medium text-[#0f3a26]/50 ring-1 ring-inset ring-[#0f3a26]/[0.06]">Payment ID: {info.paymentId}</p>
+            <button onClick={onClose} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006E42] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#005634]">Done</button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

@@ -1,7 +1,5 @@
 "use client";
 
-import { PLAN_LINKS, PLAN_PRICE_INR } from "@/lib/payments/razorpay";
-
 /* ------------------------------ infra ------------------------------ */
 
 const DELAY = 160;
@@ -33,13 +31,9 @@ function uid(p: string) {
 
 export type PlanStatus = "empty" | "active";
 
-export type PlanKind = "daily" | "weekly";
-
 export type PlanState = {
   status: PlanStatus;
   fileName?: string;
-  plan?: PlanKind;
-  paymentId?: string;
   generatedAt?: string;
   day: number; // day X of 7 in the current cycle
 };
@@ -63,20 +57,6 @@ export async function activatePlan(fileName: string): Promise<PlanState> {
   return delay(next, 200);
 }
 
-/** Activate a plan after a successful Razorpay payment. */
-export async function activatePaidPlan(plan: PlanKind, paymentId: string): Promise<PlanState> {
-  const next: PlanState = {
-    status: "active",
-    plan,
-    paymentId,
-    fileName: PLANS[plan].name,
-    generatedAt: new Date().toISOString(),
-    day: 1,
-  };
-  writeLocal(LS_STATE, next);
-  return delay(next, 160);
-}
-
 export async function resetPlan(): Promise<PlanState> {
   const next: PlanState = { status: "empty", day: 1 };
   writeLocal(LS_STATE, next);
@@ -85,38 +65,6 @@ export async function resetPlan(): Promise<PlanState> {
   writeLocal(LS_ROUTINE, [] as RoutineItem[]);
   return delay(next, 140);
 }
-
-/* ------------------------------ paid plans ------------------------------ */
-
-export type PlanOffer = { id: PlanKind; name: string; tagline: string; priceINR: number; link: string; features: string[]; badge?: string };
-
-export const PLANS: Record<PlanKind, PlanOffer> = {
-  daily: {
-    id: "daily",
-    name: "Daily meal plan",
-    tagline: "Today, fully mapped out",
-    priceINR: PLAN_PRICE_INR.daily,
-    link: PLAN_LINKS.daily,
-    features: [
-      "A full day of meals within your calorie target",
-      "Swap any meal or add extra portions",
-      "Recipes with steps and short videos",
-    ],
-  },
-  weekly: {
-    id: "weekly",
-    name: "Weekly meal plan",
-    tagline: "Seven days, sorted",
-    priceINR: PLAN_PRICE_INR.weekly,
-    link: PLAN_LINKS.weekly,
-    badge: "Best value",
-    features: [
-      "A 7-day meal and routine schedule",
-      "Balanced macros across the whole week",
-      "Everything in the daily plan, included",
-    ],
-  },
-};
 
 export async function fetchDoneIds(): Promise<string[]> {
   return delay(readLocal<string[]>(LS_DONE, []));
