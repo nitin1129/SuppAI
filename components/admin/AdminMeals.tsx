@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AdminTopbar } from "@/components/admin/AdminTopbar";
 import {
+  CUISINES,
   DIETS,
   DIET_META,
   MEAL_CATEGORIES,
@@ -20,14 +21,13 @@ import {
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-type Filter = "all" | Diet;
-
 /* ---------- form draft ---------- */
 type Draft = {
   id?: string;
   name: string;
   image: string;
   category: string;
+  cuisine: string;
   diet: Diet;
   tag: string;
   description: string;
@@ -41,13 +41,13 @@ type Draft = {
 };
 
 const EMPTY: Draft = {
-  name: "", image: "", category: "Lunch", diet: "veg", tag: "", description: "", youtubeUrl: "",
+  name: "", image: "", category: "Lunch", cuisine: "North Indian", diet: "veg", tag: "", description: "", youtubeUrl: "",
   kcal: "", protein: "", timeMins: "15", servings: "1", ingredients: "", steps: "",
 };
 
 function toDraft(m: Meal): Draft {
   return {
-    id: m.id, name: m.name, image: m.image, category: m.category, diet: m.diet, tag: m.tag,
+    id: m.id, name: m.name, image: m.image, category: m.category, cuisine: m.cuisine, diet: m.diet, tag: m.tag,
     description: m.description, youtubeUrl: m.youtubeUrl ?? "",
     kcal: String(m.kcal), protein: String(m.protein), timeMins: String(m.timeMins), servings: String(m.servings),
     ingredients: m.ingredients.join("\n"), steps: m.steps.join("\n"),
@@ -57,25 +57,27 @@ function slug(s: string) { return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
 
 export function AdminMeals() {
   const [meals, setMeals] = useState<Meal[] | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<string>("all"); // "all" | diet key | "cuisine:<name>"
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Draft | null>(null);
 
   useEffect(() => { fetchMeals().then(setMeals); }, []);
 
-  const counts = useMemo(() => {
-    const c: Record<Filter, number> = { all: 0, veg: 0, egg: 0, nonveg: 0, vegan: 0 };
-    for (const m of meals ?? []) { c.all += 1; c[m.diet] += 1; }
-    return c;
-  }, [meals]);
-  const withVideo = useMemo(() => (meals ?? []).filter((m) => youtubeId(m.youtubeUrl)).length, [meals]);
+  const list = meals ?? [];
+  const countFor = (key: string) => key === "all" ? list.length : key.startsWith("cuisine:") ? list.filter((m) => m.cuisine === key.slice(8)).length : list.filter((m) => m.diet === key).length;
+  const dietStat = (d: Diet) => list.filter((m) => m.diet === d).length;
+  const withVideo = useMemo(() => list.filter((m) => youtubeId(m.youtubeUrl)).length, [meals]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const dietChips = DIETS.filter((d) => list.some((m) => m.diet === d.key));
+  const cuisineChips = CUISINES.filter((c) => list.some((m) => m.cuisine === c));
 
   const filtered = useMemo(() => {
     if (!meals) return [];
     const q = query.trim().toLowerCase();
+    const match = (m: Meal) => filter === "all" ? true : filter.startsWith("cuisine:") ? m.cuisine === filter.slice(8) : m.diet === filter;
     return meals
-      .filter((m) => (filter === "all" ? true : m.diet === filter))
-      .filter((m) => !q || m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q) || m.tag.toLowerCase().includes(q));
+      .filter(match)
+      .filter((m) => !q || m.name.toLowerCase().includes(q) || m.cuisine.toLowerCase().includes(q) || m.category.toLowerCase().includes(q) || m.tag.toLowerCase().includes(q));
   }, [meals, filter, query]);
 
   async function handleSave(draft: Draft) {
@@ -84,6 +86,7 @@ export function AdminMeals() {
       name: draft.name.trim(),
       image: draft.image.trim() || `https://picsum.photos/seed/${slug(draft.name)}/640/480`,
       category: draft.category,
+      cuisine: draft.cuisine,
       diet: draft.diet,
       tag: draft.tag.trim() || draft.category,
       description: draft.description.trim(),
@@ -111,31 +114,29 @@ export function AdminMeals() {
       <main className="no-scrollbar flex-1 overflow-y-auto px-8 py-7">
         {/* Stats */}
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <SectionTile label="Total meals" value={String(counts.all)} sub="in the library" icon={UtensilsCrossed} accent />
-          <SectionTile label="Veg options" value={String(counts.veg + counts.vegan)} sub={`${counts.vegan} vegan`} icon={Flame} />
-          <SectionTile label="Non-veg options" value={String(counts.nonveg + counts.egg)} sub={`${counts.egg} with egg`} icon={Dumbbell} />
+          <SectionTile label="Total meals" value={String(list.length)} sub="in the library" icon={UtensilsCrossed} accent />
+          <SectionTile label="Vegetarian" value={String(dietStat("veg") + dietStat("jain") + dietStat("vegan"))} sub={`${dietStat("vegan")} vegan, ${dietStat("jain")} jain`} icon={Flame} />
+          <SectionTile label="Non-vegetarian" value={String(dietStat("nonveg"))} sub="meals with meat or fish" icon={Dumbbell} />
           <SectionTile label="With video" value={String(withVideo)} sub="have a YouTube guide" icon={Film} />
         </div>
 
         {/* Controls */}
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {(["all", "veg", "egg", "nonveg", "vegan"] as Filter[]).map((f) => (
-              <button key={f} onClick={() => setFilter(f)} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium transition ${filter === f ? "bg-[#006E42] text-white" : "bg-white text-[#0f3a26]/70 ring-1 ring-[#0f3a26]/8 hover:ring-[#006E42]/30"}`}>
-                {f === "all" ? "All" : DIET_META[f].label}
-                <span className={`rounded-full px-1.5 text-[10px] tabular-nums ${filter === f ? "bg-white/15" : "bg-[#0f3a26]/8"}`}>{counts[f]}</span>
-              </button>
-            ))}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-[13px] text-[#0f3a26]/55 ring-1 ring-[#0f3a26]/8 focus-within:ring-[#006E42]/40 md:w-64">
+            <Search className="h-3.5 w-3.5 text-[#0f3a26]/40" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search meals…" className="w-full bg-transparent text-[#0f3a26] placeholder:text-[#0f3a26]/35 focus:outline-none" />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-[13px] text-[#0f3a26]/55 ring-1 ring-[#0f3a26]/8 focus-within:ring-[#006E42]/40 md:w-64">
-              <Search className="h-3.5 w-3.5 text-[#0f3a26]/40" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search meals…" className="w-full bg-transparent text-[#0f3a26] placeholder:text-[#0f3a26]/35 focus:outline-none" />
-            </div>
-            <button onClick={() => setEditing({ ...EMPTY })} className="inline-flex items-center gap-1.5 rounded-xl bg-[#006E42] px-3.5 py-2 text-[13px] font-semibold text-white transition hover:bg-[#005634]">
-              <Plus className="h-4 w-4" /> New meal
-            </button>
-          </div>
+          <button onClick={() => setEditing({ ...EMPTY })} className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-[#006E42] px-3.5 py-2 text-[13px] font-semibold text-white transition hover:bg-[#005634]">
+            <Plus className="h-4 w-4" /> New meal
+          </button>
+        </div>
+
+        {/* Filter tags */}
+        <div className="mb-5 flex flex-wrap items-center gap-1.5">
+          <FilterChip active={filter === "all"} onClick={() => setFilter("all")} label="All" count={countFor("all")} />
+          {dietChips.map((d) => <FilterChip key={d.key} active={filter === d.key} onClick={() => setFilter(d.key)} label={d.label} count={countFor(d.key)} />)}
+          {cuisineChips.length > 0 && <span className="mx-1 h-4 w-px bg-[#0f3a26]/10" />}
+          {cuisineChips.map((c) => <FilterChip key={c} active={filter === `cuisine:${c}`} onClick={() => setFilter(`cuisine:${c}`)} label={c} count={countFor(`cuisine:${c}`)} />)}
         </div>
 
         {/* Grid */}
@@ -174,13 +175,14 @@ function MealCard({ meal, onEdit }: { meal: Meal; onEdit: () => void }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={meal.image} alt="" onError={() => setBroken(true)} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
         )}
-        <span className={`absolute left-2.5 top-2.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${diet.cls}`}>{diet.label}</span>
+        <span className={`absolute left-2.5 top-2.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${diet.cls}`}>{diet.short}</span>
         {hasVideo && <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm"><Film className="h-3 w-3" /> Video</span>}
         <span className="absolute bottom-2.5 right-2.5 grid h-8 w-8 place-items-center rounded-lg bg-white/90 text-[#006E42] opacity-0 shadow-sm backdrop-blur-sm transition group-hover:opacity-100"><Pencil className="h-3.5 w-3.5" /></span>
       </div>
       <div className="p-3.5">
-        <div className="flex items-center gap-2 text-[10.5px] font-medium text-[#0f3a26]/50">
+        <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] font-medium text-[#0f3a26]/50">
           <span className="rounded bg-[#006E42]/8 px-1.5 py-0.5 text-[#006E42]">{meal.category}</span>
+          <span className="rounded bg-[#0f3a26]/6 px-1.5 py-0.5">{meal.cuisine}</span>
           <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{meal.timeMins}m</span>
         </div>
         <p className="mt-1.5 line-clamp-1 text-[14px] font-bold tracking-tight text-[#0f3a26]">{meal.name || "Untitled meal"}</p>
@@ -223,7 +225,7 @@ function MealForm({ draft, onClose, onSave, onDelete }: { draft: Draft | null; o
       {draft && (
         <motion.div className="fixed inset-0 z-50 flex justify-end" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
           <div className="absolute inset-0 bg-[#0c1614]/45" onClick={onClose} aria-hidden />
-          <motion.div role="dialog" aria-modal="true" aria-label={isEdit ? "Edit meal" : "New meal"} className="relative flex h-full w-full max-w-md flex-col bg-[#fbfdfb] shadow-2xl" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ duration: 0.34, ease: EASE }}>
+          <motion.div role="dialog" aria-modal="true" aria-label={isEdit ? "Edit meal" : "New meal"} className="relative flex h-full w-full max-w-xl flex-col bg-[#fbfdfb] shadow-2xl" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ duration: 0.34, ease: EASE }}>
             {/* header */}
             <div className="flex items-center justify-between border-b border-[#0f3a26]/8 bg-white px-5 py-4">
               <div>
@@ -240,13 +242,15 @@ function MealForm({ draft, onClose, onSave, onDelete }: { draft: Draft | null; o
               </Field>
 
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Category">
+                <Field label="Meal time">
                   <select value={d.category} onChange={(e) => set("category", e.target.value)} className={inputCls}>
                     {MEAL_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
                   </select>
                 </Field>
-                <Field label="Tag / badge">
-                  <input value={d.tag} onChange={(e) => set("tag", e.target.value)} placeholder="High protein" className={inputCls} />
+                <Field label="Cuisine">
+                  <select value={d.cuisine} onChange={(e) => set("cuisine", e.target.value)} className={inputCls}>
+                    {CUISINES.map((c) => <option key={c}>{c}</option>)}
+                  </select>
                 </Field>
               </div>
 
@@ -256,6 +260,10 @@ function MealForm({ draft, onClose, onSave, onDelete }: { draft: Draft | null; o
                     <button key={dt.key} type="button" onClick={() => set("diet", dt.key)} className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition ${d.diet === dt.key ? "bg-[#006E42] text-white" : `${dt.cls} ring-1 ring-inset ring-[#0f3a26]/8`}`}>{dt.label}</button>
                   ))}
                 </div>
+              </Field>
+
+              <Field label="Tag / badge" hint="Short label shown on the card.">
+                <input value={d.tag} onChange={(e) => set("tag", e.target.value)} placeholder="High protein" className={inputCls} />
               </Field>
 
               <div className="grid grid-cols-2 gap-3">
@@ -336,6 +344,15 @@ function Field({ label, required, hint, children }: { label: string; required?: 
       </span>
       {children}
     </label>
+  );
+}
+
+function FilterChip({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count: number }) {
+  return (
+    <button onClick={onClick} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium transition ${active ? "bg-[#006E42] text-white" : "bg-white text-[#0f3a26]/70 ring-1 ring-[#0f3a26]/8 hover:ring-[#006E42]/30"}`}>
+      {label}
+      <span className={`rounded-full px-1.5 text-[10px] tabular-nums ${active ? "bg-white/15" : "bg-[#0f3a26]/8"}`}>{count}</span>
+    </button>
   );
 }
 

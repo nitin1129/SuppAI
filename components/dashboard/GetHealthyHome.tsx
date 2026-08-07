@@ -24,6 +24,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Search,
   ShieldCheck,
   Sparkles,
   Sun,
@@ -485,7 +486,7 @@ function BlockRow({ b, done, onToggle, onRemove, onEdit, reduce }: { b: DayBlock
   const editable = b.type === "meal" || b.type === "snack";
   return (
     <motion.li layout initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.28, ease: EASE }} className="flex items-center gap-2">
-      <button onClick={() => onToggle(b.id)} className={`flex flex-1 items-center gap-3 rounded-2xl p-3 text-left ring-1 ring-inset transition ${done ? "bg-[#006E42]/[0.05] ring-[#006E42]/15" : "bg-[#f1f7f3] ring-[#0f3a26]/[0.08] hover:ring-[#006E42]/25 hover:shadow-[0_6px_16px_-10px_rgba(15,58,38,0.28)]"}`}>
+      <div onClick={() => onToggle(b.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(b.id); } }} className={`flex flex-1 cursor-pointer items-center gap-3 rounded-2xl p-3 text-left ring-1 ring-inset transition ${done ? "bg-[#006E42]/[0.05] ring-[#006E42]/15" : "bg-[#f1f7f3] ring-[#0f3a26]/[0.08] hover:ring-[#006E42]/25 hover:shadow-[0_6px_16px_-10px_rgba(15,58,38,0.28)]"}`}>
         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-colors ${done ? "bg-[#006E42] text-white" : meta.tint}`}>{done ? <Check className="h-4 w-4" /> : <meta.icon className="h-4 w-4" />}</span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -495,11 +496,11 @@ function BlockRow({ b, done, onToggle, onRemove, onEdit, reduce }: { b: DayBlock
           </div>
           <p className="mt-0.5 truncate text-[11px] text-[#0f3a26]/55">{b.detail || TYPE_LABEL[b.type]}{b.kcal ? ` · ${b.kcal} kcal` : ""}</p>
         </div>
-      </button>
-      <div className="flex shrink-0 items-center gap-1">
-        <button onClick={() => onToggle(b.id)} aria-label={done ? "Mark not done" : "Mark done"} className={`grid h-8 w-8 place-items-center rounded-full border-2 transition ${done ? "border-[#006E42] bg-[#006E42] text-white" : "border-[#0f3a26]/20 text-transparent hover:border-[#006E42]/40"}`}><Check className="h-4 w-4" /></button>
-        {editable && <button onClick={() => onEdit(b)} aria-label="Adjust meal" className="grid h-8 w-8 place-items-center rounded-lg text-[#0f3a26]/35 transition hover:bg-[#006E42]/8 hover:text-[#006E42]"><Pencil className="h-3.5 w-3.5" /></button>}
-        <button onClick={() => onRemove(b.id)} aria-label="Remove block" className="grid h-8 w-8 place-items-center rounded-lg text-[#0f3a26]/30 transition hover:bg-[#c14040]/8 hover:text-[#c14040]"><Trash2 className="h-3.5 w-3.5" /></button>
+        {editable && <button onClick={(e) => { e.stopPropagation(); onEdit(b); }} aria-label="Adjust meal" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[#0f3a26]/40 ring-1 ring-inset ring-[#0f3a26]/12 transition hover:bg-white hover:text-[#006E42] hover:ring-[#006E42]/35"><Pencil className="h-4 w-4" /></button>}
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <button onClick={() => onToggle(b.id)} aria-label={done ? "Mark not done" : "Mark done"} className={`grid h-8 w-8 place-items-center rounded-lg ring-1 ring-inset transition ${done ? "bg-[#006E42] text-white ring-[#006E42]" : "text-transparent ring-[#0f3a26]/20 hover:ring-[#006E42]/40"}`}><Check className="h-4 w-4" /></button>
+        <button onClick={() => onRemove(b.id)} aria-label="Remove block" className="grid h-8 w-8 place-items-center rounded-lg text-[#0f3a26]/45 ring-1 ring-inset ring-[#0f3a26]/12 transition hover:text-[#c14040] hover:ring-[#c14040]/35"><Trash2 className="h-4 w-4" /></button>
       </div>
     </motion.li>
   );
@@ -734,7 +735,7 @@ function RecipeRail({ onOpen }: { onOpen: (r: Meal) => void }) {
         <div className="mb-3 flex flex-wrap items-center gap-1.5">
           <button onClick={() => setDiet("all")} className={`rounded-full px-3 py-1 text-[12px] font-semibold transition ${diet === "all" ? "bg-[#006E42] text-white" : "bg-white text-[#0f3a26]/65 ring-1 ring-[#0f3a26]/10 hover:ring-[#006E42]/30"}`}>All</button>
           {chips.map((d) => (
-            <button key={d.key} onClick={() => setDiet(d.key)} className={`rounded-full px-3 py-1 text-[12px] font-semibold transition ${diet === d.key ? "bg-[#006E42] text-white" : "bg-white text-[#0f3a26]/65 ring-1 ring-[#0f3a26]/10 hover:ring-[#006E42]/30"}`}>{d.label}</button>
+            <button key={d.key} onClick={() => setDiet(d.key)} className={`rounded-full px-3 py-1 text-[12px] font-semibold transition ${diet === d.key ? "bg-[#006E42] text-white" : "bg-white text-[#0f3a26]/65 ring-1 ring-[#0f3a26]/10 hover:ring-[#006E42]/30"}`}>{d.short}</button>
           ))}
         </div>
       )}
@@ -758,7 +759,7 @@ function RecipeRail({ onOpen }: { onOpen: (r: Meal) => void }) {
                   <div className="relative h-44 overflow-hidden">
                     <span className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${r.image})` }} aria-hidden />
                     <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold text-[#006E42] backdrop-blur">{r.tag}</span>
-                    <span className={`absolute left-3 bottom-3 rounded-full px-2 py-0.5 text-[10px] font-semibold ${dm.cls}`}>{dm.label}</span>
+                    <span className={`absolute left-3 bottom-3 rounded-full px-2 py-0.5 text-[10px] font-semibold ${dm.cls}`}>{dm.short}</span>
                     {hasVideo && <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm"><Film className="h-3 w-3" />Video</span>}
                     <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold text-[#0f3a26] backdrop-blur"><Timer className="h-3 w-3" />{r.timeMins}m</span>
                   </div>
@@ -835,7 +836,7 @@ function RecipeModal({ recipe, onClose, onLog, canLog }: { recipe: Meal | null; 
                 <div className="absolute bottom-3 left-4 right-4">
                   <div className="flex items-center gap-1.5">
                     <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold text-[#006E42]">{recipe.tag}</span>
-                    {dm && <span className={`rounded-full px-2 py-1 text-[10.5px] font-semibold ${dm.cls}`}>{dm.label}</span>}
+                    {dm && <span className={`rounded-full px-2 py-1 text-[10.5px] font-semibold ${dm.cls}`}>{dm.short}</span>}
                   </div>
                   <h2 className="mt-1.5 text-[19px] font-bold text-white">{recipe.name}</h2>
                 </div>
@@ -1013,84 +1014,181 @@ function AddEventModal({ init, onClose, onAddDay, onAddRoutine }: { init: AddIni
 
 /* ============================== Meal editor ============================== */
 
-function parseMeal(detail?: string): { name: string; grams: string } {
-  const grams = /(\d+)\s*g/.exec(detail || "")?.[1] ?? "100";
-  const namePart = (detail || "").split("·")[0].trim();
-  const food = findFood(namePart);
-  return { name: food ? food.name : "", grams };
-}
-
 function MealEditor({ block, onClose, onSave }: { block: DayBlock | null; onClose: () => void; onSave: (id: string, patch: Partial<Omit<DayBlock, "id">>) => void }) {
   const reduce = useReducedMotion();
-  const [name, setName] = useState("");
-  const [grams, setGrams] = useState("100");
+  const [tab, setTab] = useState<"choose" | "extra">("choose");
+  const [meals, setMeals] = useState<Meal[] | null>(null);
+  const [filter, setFilter] = useState<string>("all"); // "all" | diet key | "cat:<Category>"
+  // add extra
+  const [foodName, setFoodName] = useState("");
+  const [query, setQuery] = useState("");
+  const [listOpen, setListOpen] = useState(false);
+  const [count, setCount] = useState(1);
+  const [grams, setGrams] = useState(50);
 
   useEffect(() => {
     if (!block) return;
-    const p = parseMeal(block.detail);
-    setName(p.name);
-    setGrams(p.grams);
+    setTab("choose"); setFilter("all"); setFoodName(""); setQuery(""); setListOpen(false); setCount(1); setGrams(50);
+    fetchMeals().then(setMeals);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
   }, [block, onClose]);
 
-  const matched = findFood(name);
-  const g = Number(grams) || 0;
-  const kcal = matched && g > 0 ? Math.round((matched.kcal * g) / 100) : 0;
-  const canSave = !!matched && g > 0;
-  const bump = (d: number) => setGrams((cur) => String(Math.max(0, (Number(cur) || 0) + d)));
+  const list = meals ?? [];
+  const dietChips = DIETS.filter((d) => list.some((m) => m.diet === d.key));
+  const cuisineChips = Array.from(new Set(list.map((m) => m.cuisine)));
+  const shown = list.filter((m) => filter === "all" ? true : filter.startsWith("cuisine:") ? m.cuisine === filter.slice(8) : m.diet === filter);
 
-  function save() {
-    if (!block || !canSave || !matched) return;
-    onSave(block.id, { type: block.type === "snack" ? "snack" : "meal", detail: `${matched.name} · ${g} g`, kcal });
+  const food = findFood(foodName);
+  const extraKcal = food ? Math.round((food.kcal * count * grams) / 100) : 0;
+  const foodMatches = query.trim() ? FOODS.filter((f) => f.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 7) : [];
+
+  function chooseMeal(m: Meal) {
+    if (!block) return;
+    onSave(block.id, { type: block.type === "snack" ? "snack" : "meal", detail: m.name, kcal: m.kcal });
   }
+  function addExtra() {
+    if (!block || !food) return;
+    const label = count > 1 ? `${count} ${food.name.replace(/ \/.*$/, "")}` : food.name.replace(/ \/.*$/, "");
+    const clean = block.detail && block.detail.toLowerCase() !== "from recipes" ? block.detail : "";
+    onSave(block.id, { type: block.type === "snack" ? "snack" : "meal", detail: clean ? `${clean} + ${label}` : label, kcal: (block.kcal ?? 0) + extraKcal });
+  }
+
+  const chipCls = (active: boolean) => `whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition ${active ? "bg-[#006E42] text-white shadow-sm" : "bg-white text-[#0f3a26]/60 ring-1 ring-inset ring-[#0f3a26]/10 hover:ring-[#006E42]/35"}`;
 
   return (
     <AnimatePresence>
       {block && (
-        <motion.div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-          <div className="absolute inset-0 bg-[#0f3a26]/45" onClick={onClose} aria-hidden />
-          <motion.div role="dialog" aria-modal="true" aria-label="Adjust meal" className={`relative w-full max-w-md ${CARD} p-5`} initial={reduce ? false : { opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }} transition={{ duration: 0.3, ease: EASE }}>
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-[16px] font-bold tracking-tight text-[#0f3a26]">Adjust {block.title || "meal"}</h2>
-                <p className="text-[11.5px] text-[#0f3a26]/55">Change the food and quantity, calories update automatically.</p>
+        <motion.div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+          <div className="absolute inset-0 bg-[#0f3a26]/50" onClick={onClose} aria-hidden />
+          <motion.div role="dialog" aria-modal="true" aria-label="Adjust meal" className={`relative flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden ${CARD}`} initial={reduce ? false : { opacity: 0, y: 22, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduce ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.98 }} transition={{ duration: 0.3, ease: EASE }}>
+            {/* header */}
+            <div className="flex items-start gap-3 border-b border-[#0f3a26]/8 px-5 py-4 sm:px-6 sm:py-5">
+              <button onClick={onClose} aria-label="Back" className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[#0f3a26]/55 transition hover:bg-[#0f3a26]/6 hover:text-[#0f3a26]"><ChevronLeft className="h-5 w-5" /></button>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[20px] font-bold leading-tight tracking-tight text-[#0f3a26] sm:text-[22px]">Choose a different meal</h2>
+                <p className="mt-0.5 text-[12.5px] leading-snug text-[#0f3a26]/60">Browse the categories and find a meal within your calorie limit that helps you hit <span className="italic">your</span> goals.</p>
               </div>
-              <button onClick={onClose} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-lg text-[#0f3a26]/50 transition hover:bg-[#0f3a26]/6 hover:text-[#0f3a26]"><X className="h-4 w-4" /></button>
             </div>
 
-            <label className="block">
-              <span className="mb-1.5 block text-[11px] font-semibold text-[#0f3a26]/60">Food</span>
-              <input list="meal-food-list" value={name} onChange={(e) => setName(e.target.value)} placeholder="Search a food…" className="w-full rounded-xl border border-[#0f3a26]/12 bg-[#f6faf7] px-3.5 py-2.5 text-[14px] text-[#0f3a26] placeholder:text-[#0f3a26]/30 focus:border-[#006E42]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#006E42]/15" />
-              <datalist id="meal-food-list">{FOODS.map((f) => <option key={f.name} value={f.name} />)}</datalist>
-            </label>
+            {/* tabs */}
+            <div className="flex shrink-0 items-center gap-1 border-b border-[#0f3a26]/8 px-5 sm:px-6">
+              {([["choose", "Choose a meal"], ["extra", "Add extra"]] as const).map(([k, label]) => (
+                <button key={k} onClick={() => setTab(k)} className={`relative -mb-px border-b-2 px-1.5 py-2.5 text-[13px] font-semibold transition ${tab === k ? "border-[#006E42] text-[#006E42]" : "border-transparent text-[#0f3a26]/45 hover:text-[#0f3a26]/70"}`}>{label}</button>
+              ))}
+            </div>
 
-            <div className="mt-3">
-              <span className="mb-1.5 block text-[11px] font-semibold text-[#0f3a26]/60">Quantity</span>
-              <div className="flex items-center gap-2">
-                <button onClick={() => bump(-25)} aria-label="Less" className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-[#f1f7f3] text-[#0f3a26]/70 ring-1 ring-inset ring-[#0f3a26]/[0.08] transition hover:text-[#006E42]"><Minus className="h-4 w-4" /></button>
-                <div className="relative flex-1">
-                  <input value={grams} onChange={(e) => setGrams(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" className="w-full rounded-xl border border-[#0f3a26]/12 bg-[#f6faf7] px-3.5 py-2.5 text-center text-[15px] font-semibold text-[#0f3a26] focus:border-[#006E42]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#006E42]/15" />
-                  <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11.5px] font-medium text-[#0f3a26]/40">g</span>
+            {/* body */}
+            {tab === "choose" ? (
+              <div className="flex min-h-0 flex-1 flex-col gap-3 bg-[#fbfdfb] p-4 sm:flex-row sm:gap-5 sm:p-5">
+                {/* filter rail */}
+                <div className="shrink-0 sm:w-44">
+                  <p className="mb-2 hidden px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0f3a26]/40 sm:block">Filter by</p>
+                  <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1 sm:flex-col sm:overflow-y-auto sm:pb-0">
+                    <button onClick={() => setFilter("all")} className={chipCls(filter === "all")}>All meals</button>
+                    {dietChips.map((d) => <button key={d.key} onClick={() => setFilter(d.key)} className={chipCls(filter === d.key)}>{d.label}</button>)}
+                    {cuisineChips.length > 0 && <div className="mx-1 hidden h-px shrink-0 bg-[#0f3a26]/8 sm:my-1.5 sm:block" />}
+                    {cuisineChips.map((c) => <button key={c} onClick={() => setFilter(`cuisine:${c}`)} className={chipCls(filter === `cuisine:${c}`)}>{c}</button>)}
+                  </div>
                 </div>
-                <button onClick={() => bump(25)} aria-label="More" className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-[#f1f7f3] text-[#0f3a26]/70 ring-1 ring-inset ring-[#0f3a26]/[0.08] transition hover:text-[#006E42]"><Plus className="h-4 w-4" /></button>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {[50, 100, 150, 200].map((q) => (
-                  <button key={q} onClick={() => setGrams(String(q))} className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${g === q ? "bg-[#006E42] text-white" : "bg-[#f1f7f3] text-[#0f3a26]/60 ring-1 ring-inset ring-[#0f3a26]/[0.08]"}`}>{q}g</button>
-                ))}
-              </div>
-            </div>
 
-            <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#006E42]/[0.07] px-4 py-3 ring-1 ring-inset ring-[#006E42]/15">
-              <span className="text-[12.5px] font-semibold text-[#0f3a26]">{matched ? matched.name : "Pick a food"}</span>
-              <span className="inline-flex items-center gap-1 text-[18px] font-bold tabular-nums text-[#006E42]"><Flame className="h-4 w-4 text-[#c79a3d]" />{kcal} kcal</span>
-            </div>
+                {/* meal list */}
+                <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
+                  {!meals ? (
+                    <div className="grid gap-2.5">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[92px] animate-pulse rounded-2xl bg-[#f1f7f3]" />)}</div>
+                  ) : shown.length === 0 ? (
+                    <div className="grid h-full min-h-40 place-items-center text-center text-[13px] text-[#0f3a26]/50">No meals in this category yet.</div>
+                  ) : (
+                    <>
+                      <p className="mb-2.5 px-0.5 text-[11px] text-[#0f3a26]/45"><span className="font-bold text-[#0f3a26]/70">{shown.length}</span> meal{shown.length === 1 ? "" : "s"} to choose from</p>
+                      <div className="grid gap-2.5">
+                        {shown.map((m) => {
+                          const dm = DIET_META[m.diet];
+                          const current = block.detail === m.name;
+                          return (
+                            <div key={m.id} className={`group flex items-center gap-3 rounded-2xl p-2.5 ring-1 transition ${current ? "bg-[#006E42]/[0.06] ring-[#006E42]/30" : "bg-white ring-[#0f3a26]/8 hover:ring-[#006E42]/30 hover:shadow-[0_12px_30px_-20px_rgba(15,58,38,0.45)]"}`}>
+                              <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-[#f1f7f3]">
+                                <span className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-[1.06]" style={{ backgroundImage: `url(${m.image})` }} aria-hidden />
+                                {youtubeId(m.youtubeUrl) && <span className="absolute bottom-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-black/55 text-white backdrop-blur-sm"><Play className="h-2.5 w-2.5 translate-x-[0.5px] fill-current" /></span>}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="truncate text-[14px] font-bold text-[#0f3a26]">{m.name}</p>
+                                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${dm.cls}`}>{dm.short}</span>
+                                </div>
+                                {m.description && <p className="mt-0.5 line-clamp-1 text-[11px] leading-snug text-[#0f3a26]/55">{m.description}</p>}
+                                <div className="mt-1.5 flex items-center gap-2.5 text-[11px] font-semibold text-[#0f3a26]/60">
+                                  <span className="inline-flex items-center gap-1"><Flame className="h-3 w-3 text-[#c79a3d]" />{m.kcal}</span>
+                                  <span className="inline-flex items-center gap-1"><Dumbbell className="h-3 w-3 text-[#006E42]" />{m.protein}g</span>
+                                  <span className="inline-flex items-center gap-1"><Timer className="h-3 w-3 text-[#0f3a26]/40" />{m.timeMins}m</span>
+                                  <span className="ml-auto shrink-0 rounded bg-[#0f3a26]/[0.05] px-1.5 py-0.5 text-[9.5px] font-medium text-[#0f3a26]/50">{m.cuisine}</span>
+                                </div>
+                              </div>
+                              <button onClick={() => chooseMeal(m)} disabled={current} className={`shrink-0 rounded-full px-3.5 py-2 text-[12px] font-semibold transition ${current ? "bg-[#006E42] text-white" : "bg-[#006E42]/10 text-[#006E42] hover:bg-[#006E42] hover:text-white"}`}>{current ? "Selected" : "Select"}</button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* add extra */
+              <div className="no-scrollbar flex-1 overflow-y-auto p-5 sm:p-6">
+                <p className="text-[12.5px] text-[#0f3a26]/60">Top up <span className="font-semibold text-[#0f3a26]">{block.title || "this meal"}</span> with an extra item, for example another roti or some more rice. It is added on top of the current calories.</p>
 
-            <button onClick={save} disabled={!canSave} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006E42] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#005634] disabled:opacity-45"><Check className="h-4 w-4" />Save meal</button>
-            {name && !matched && <p className="mt-2 text-center text-[11px] text-[#c14040]">Pick a food from the suggestions to set calories.</p>}
+                <div className="relative mt-4">
+                  <span className="mb-1.5 block text-[11px] font-semibold text-[#0f3a26]/60">Extra food</span>
+                  <div className="flex items-center gap-2 rounded-xl border border-[#0f3a26]/12 bg-[#f6faf7] px-3.5 py-2.5 focus-within:border-[#006E42]/40 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#006E42]/15">
+                    <Search className="h-4 w-4 shrink-0 text-[#0f3a26]/35" />
+                    <input value={query} onChange={(e) => { setQuery(e.target.value); setFoodName(""); setListOpen(true); }} onFocus={() => setListOpen(true)} placeholder="Search a food (roti, rice, egg…)" className="w-full bg-transparent text-[14px] text-[#0f3a26] placeholder:text-[#0f3a26]/30 focus:outline-none" />
+                  </div>
+                  {listOpen && query.trim() && (
+                    <ul className="absolute z-20 mt-1.5 max-h-56 w-full overflow-y-auto rounded-xl border border-[#0f3a26]/10 bg-white py-1 shadow-[0_16px_36px_-18px_rgba(15,58,38,0.4)]">
+                      {foodMatches.length ? foodMatches.map((f) => (
+                        <li key={f.name}>
+                          <button onClick={() => { setFoodName(f.name); setQuery(f.name); setListOpen(false); }} className="flex w-full items-center justify-between px-3.5 py-2 text-left text-[13px] text-[#0f3a26] transition hover:bg-[#f1f7f3]">
+                            <span>{f.name}</span><span className="text-[11px] text-[#0f3a26]/40">{f.kcal} kcal/100g</span>
+                          </button>
+                        </li>
+                      )) : <li className="px-3.5 py-2 text-[12.5px] text-[#0f3a26]/45">No food found.</li>}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="mb-1.5 block text-[11px] font-semibold text-[#0f3a26]/60">How many</span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setCount((c) => Math.max(1, c - 1))} aria-label="Fewer" className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-[#f1f7f3] text-[#0f3a26]/70 ring-1 ring-inset ring-[#0f3a26]/[0.08] transition hover:text-[#006E42]"><Minus className="h-4 w-4" /></button>
+                      <div className="grid h-[42px] flex-1 place-items-center rounded-xl border border-[#0f3a26]/12 bg-[#f6faf7] text-[15px] font-bold tabular-nums text-[#0f3a26]">{count}</div>
+                      <button onClick={() => setCount((c) => Math.min(20, c + 1))} aria-label="More" className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-[#f1f7f3] text-[#0f3a26]/70 ring-1 ring-inset ring-[#0f3a26]/[0.08] transition hover:text-[#006E42]"><Plus className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="mb-1.5 block text-[11px] font-semibold text-[#0f3a26]/60">Grams each</span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setGrams((g) => Math.max(5, g - 10))} aria-label="Less" className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-[#f1f7f3] text-[#0f3a26]/70 ring-1 ring-inset ring-[#0f3a26]/[0.08] transition hover:text-[#006E42]"><Minus className="h-4 w-4" /></button>
+                      <div className="relative flex-1">
+                        <input value={grams} onChange={(e) => setGrams(Math.max(0, Number(e.target.value.replace(/[^0-9]/g, "")) || 0))} inputMode="numeric" className="h-[42px] w-full rounded-xl border border-[#0f3a26]/12 bg-[#f6faf7] px-3 text-center text-[15px] font-bold text-[#0f3a26] focus:border-[#006E42]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#006E42]/15" />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[#0f3a26]/40">g</span>
+                      </div>
+                      <button onClick={() => setGrams((g) => g + 10)} aria-label="More" className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-[#f1f7f3] text-[#0f3a26]/70 ring-1 ring-inset ring-[#0f3a26]/[0.08] transition hover:text-[#006E42]"><Plus className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex items-center justify-between rounded-2xl bg-[#006E42]/[0.07] px-4 py-3 ring-1 ring-inset ring-[#006E42]/15">
+                  <span className="text-[12.5px] font-semibold text-[#0f3a26]">{food ? `${count} × ${food.name}` : "Pick a food to add"}</span>
+                  <span className="inline-flex items-center gap-1 text-[18px] font-bold tabular-nums text-[#006E42]"><Flame className="h-4 w-4 text-[#c79a3d]" />+{extraKcal} kcal</span>
+                </div>
+
+                <button onClick={addExtra} disabled={!food} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006E42] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#005634] disabled:opacity-45"><Plus className="h-4 w-4" />Add to {block.title || "meal"}</button>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}
