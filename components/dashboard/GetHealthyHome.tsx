@@ -42,12 +42,15 @@ import { useEffect, useRef, useState } from "react";
 import { HealthTools } from "@/components/dashboard/HealthTools";
 import {
   DAY_CALORIE_TARGET,
+  PLANS,
   WEEK_PLAN,
   type Achievements,
   type BlockType,
   type DayBlock,
+  type PlanKind,
   type PlanState,
   type RoutineItem,
+  activatePaidPlan,
   activatePlan,
   addDayBlock,
   addRoutineItem,
@@ -64,6 +67,7 @@ import {
 } from "@/lib/gethealthy/service";
 import { FOODS, findFood } from "@/lib/gethealthy/foods";
 import { DIETS, DIET_META, fetchMeals, youtubeId, type Diet, type Meal } from "@/lib/meals/service";
+import { isRazorpayConfigured, openRazorpay } from "@/lib/payments/razorpay";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const CARD = "rounded-3xl bg-white shadow-[0_2px_4px_-2px_rgba(15,58,38,0.08),0_16px_36px_-20px_rgba(15,58,38,0.30)] ring-1 ring-[#0f3a26]/10";
@@ -156,6 +160,9 @@ export function GetHealthyHome() {
   const [recipe, setRecipe] = useState<Meal | null>(null);
   const [add, setAdd] = useState<AddInit | null>(null);
   const [editMeal, setEditMeal] = useState<DayBlock | null>(null);
+  const [buyPlan, setBuyPlan] = useState<PlanKind | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [paid, setPaid] = useState<{ plan: PlanKind; paymentId: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const reduce = useReducedMotion();
 
@@ -180,6 +187,37 @@ export function GetHealthyHome() {
 
   const browse = () => fileRef.current?.click();
   const active = state?.status === "active" && !proc.active;
+
+  async function payNow(plan: PlanKind) {
+    const offer = PLANS[plan];
+    setPaying(true);
+    const onOk = async (paymentId: string) => {
+      const st = await activatePaidPlan(plan, paymentId);
+      setState(st);
+      setBlocks(await fetchDayBlocks());
+      setBuyPlan(null);
+      setPaying(false);
+      setPaid({ plan, paymentId });
+    };
+    // Demo mode until a real Razorpay Key ID is set: skip the popup, simulate success.
+    if (!isRazorpayConfigured()) {
+      await wait(700);
+      await onOk(`demo_${Date.now()}`);
+      return;
+    }
+    try {
+      await openRazorpay({
+        amountPaise: offer.priceINR * 100,
+        name: "SuppAI",
+        description: offer.name,
+        notes: { plan },
+        onSuccess: (id) => { void onOk(id); },
+        onDismiss: () => setPaying(false),
+      });
+    } catch {
+      setPaying(false);
+    }
+  }
 
   return (
     <div className="px-6 py-6 md:px-10">
@@ -206,7 +244,7 @@ export function GetHealthyHome() {
           onDownloadWeek={() => printDoc("SuppAI Weekly plan", buildWeekHtml(routine))}
         />
       ) : (
-        <EmptyPlan onBrowse={browse} onFile={(f) => { if (f) runProcessing(f.name); }} onSample={() => runProcessing("blood-report-jane.pdf")} onOpenRecipe={setRecipe} />
+        <EmptyPlan onBrowse={browse} onFile={(f) => { if (f) runProcessing(f.name); }} onSample={() => runProcessing("blood-report-jane.pdf")} onOpenRecipe={setRecipe} onChoosePlan={(p) => setBuyPlan(p)} />
       )}
 
       <RecipeModal recipe={recipe} onClose={() => setRecipe(null)} onLog={async (r) => { setBlocks(await addDayBlock({ time: "", type: "meal", title: r.name, detail: "From recipes", kcal: r.kcal })); setRecipe(null); }} canLog={active} />
@@ -224,6 +262,9 @@ export function GetHealthyHome() {
       />
 
       <MealEditor block={editMeal} onClose={() => setEditMeal(null)} onSave={async (id, patch) => { setBlocks(await updateDayBlock(id, patch)); setEditMeal(null); }} />
+
+      <ConfirmPayModal plan={buyPlan} paying={paying} onClose={() => { if (!paying) setBuyPlan(null); }} onConfirm={payNow} />
+      <PaidSuccessModal info={paid} onClose={() => setPaid(null)} />
     </div>
   );
 }
@@ -252,16 +293,13 @@ function Heading({ label, title, locked, action }: { label: string; title: strin
 
 /* ============================================================= EMPTY ====== */
 
-function EmptyPlan({ onBrowse, onFile, onSample, onOpenRecipe }: { onBrowse: () => void; onFile: (f?: File | null) => void; onSample: () => void; onOpenRecipe: (r: Meal) => void }) {
+function EmptyPlan({ onBrowse, onFile, onSample, onOpenRecipe, onChoosePlan }: { onBrowse: () => void; onFile: (f?: File | null) => void; onSample: () => void; onOpenRecipe: (r: Meal) => void; onChoosePlan: (p: PlanKind) => void }) {
   return (
     <div className="space-y-8">
       <Stagger i={0}><UploadSpotlight onBrowse={onBrowse} onFile={onFile} onSample={onSample} /></Stagger>
       <Stagger i={1}>
-        <Heading label="Unlocks after upload" title="Your plans" locked />
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <LockedMini title="Day plan" body="A time-blocked routine of meals, movement, and recovery for today." onUpload={onBrowse} icon={Clock} />
-          <LockedMini title="Weekly plan" body="Seven days of training and nutrition, tuned to your markers." onUpload={onBrowse} icon={CheckCircle2} />
-        </div>
+        <Heading label="Choose your plan" title="Meal plans" />
+        <PaidPlans onChoose={onChoosePlan} />
       </Stagger>
       <Stagger i={2}><HealthTools /></Stagger>
 
@@ -317,23 +355,27 @@ function UploadSpotlight({ onBrowse, onFile, onSample }: { onBrowse: () => void;
   );
 }
 
-function LockedMini({ title, body, onUpload, icon: Icon }: { title: string; body: string; onUpload: () => void; icon: React.ComponentType<{ className?: string }> }) {
+function PaidPlans({ onChoose }: { onChoose: (p: PlanKind) => void }) {
   return (
-    <div className={`${CARD} relative min-h-[210px] overflow-hidden`}>
-      <div className="pointer-events-none select-none space-y-2 p-5 blur-[3px]" aria-hidden>
-        <div className="flex items-center gap-2 text-[#0f3a26]/50"><Icon className="h-4 w-4" /><span className="h-2.5 w-24 rounded-full bg-[#0f3a26]/12" /></div>
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="flex items-center gap-3 rounded-2xl bg-[#f1f7f3] p-3 ring-1 ring-inset ring-[#0f3a26]/[0.08]"><span className="h-8 w-8 rounded-lg bg-[#006E42]/10" /><div className="flex-1 space-y-1.5"><span className="block h-2.5 w-1/3 rounded-full bg-[#0f3a26]/12" /><span className="block h-2 w-2/3 rounded-full bg-[#0f3a26]/8" /></div></div>
-        ))}
-      </div>
-      <div className="absolute inset-0 grid place-items-center bg-white/60 p-6 text-center">
-        <div>
-          <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-white text-[#006E42] shadow-[0_8px_20px_-10px_rgba(15,58,38,0.4)] ring-1 ring-[#0f3a26]/8"><Lock className="h-5 w-5" /></span>
-          <p className="mt-3 text-[14px] font-bold text-[#0f3a26]">{title}</p>
-          <p className="mx-auto mt-1 max-w-xs text-[11.5px] leading-relaxed text-[#0f3a26]/55">{body}</p>
-          <button onClick={onUpload} className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#006E42] px-3.5 py-2 text-[12.5px] font-semibold text-white transition hover:bg-[#005634]"><Upload className="h-3.5 w-3.5" />Upload to unlock</button>
-        </div>
-      </div>
+    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+      {Object.values(PLANS).map((p) => {
+        const featured = p.id === "weekly";
+        return (
+          <div key={p.id} className={`relative flex flex-col rounded-3xl bg-white p-6 ring-1 transition ${featured ? "shadow-[0_22px_50px_-30px_rgba(0,110,66,0.55)] ring-[#006E42]/30" : "ring-[#0f3a26]/10"}`}>
+            {p.badge && <span className="absolute right-5 top-5 rounded-full bg-[#006E42] px-2.5 py-1 text-[9.5px] font-bold uppercase tracking-[0.1em] text-[#9af2c4]">{p.badge}</span>}
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#006E42]/70">{p.tagline}</p>
+            <h3 className="mt-1 text-[19px] font-bold tracking-tight text-[#0f3a26]">{p.name}</h3>
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="text-[32px] font-bold tracking-tight text-[#0f3a26]">₹{p.priceINR}</span>
+              <span className="text-[12px] font-medium text-[#0f3a26]/45">/ {p.id === "daily" ? "day" : "week"}</span>
+            </div>
+            <ul className="mt-4 flex-1 space-y-2">
+              {p.features.map((f) => <li key={f} className="flex items-start gap-2 text-[12.5px] text-[#0f3a26]/70"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#006E42]" />{f}</li>)}
+            </ul>
+            <button onClick={() => onChoose(p.id)} className={`mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold transition ${featured ? "bg-[#006E42] text-white hover:bg-[#005634]" : "bg-[#006E42]/10 text-[#006E42] hover:bg-[#006E42] hover:text-white"}`}>Get {p.id === "daily" ? "the daily" : "the weekly"} plan<ArrowRight className="h-4 w-4" /></button>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1189,6 +1231,84 @@ function MealEditor({ block, onClose, onSave }: { block: DayBlock | null; onClos
                 <button onClick={addExtra} disabled={!food} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006E42] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#005634] disabled:opacity-45"><Plus className="h-4 w-4" />Add to {block.title || "meal"}</button>
               </div>
             )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ============================== Plan payment ============================== */
+
+function ConfirmPayModal({ plan, paying, onClose, onConfirm }: { plan: PlanKind | null; paying: boolean; onClose: () => void; onConfirm: (p: PlanKind) => void }) {
+  const reduce = useReducedMotion();
+  useEffect(() => {
+    if (!plan) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !paying) onClose(); };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
+  }, [plan, paying, onClose]);
+
+  const offer = plan ? PLANS[plan] : null;
+  const demo = !isRazorpayConfigured();
+
+  return (
+    <AnimatePresence>
+      {plan && offer && (
+        <motion.div className="fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+          <div className="absolute inset-0 bg-[#0f3a26]/50" onClick={() => !paying && onClose()} aria-hidden />
+          <motion.div role="dialog" aria-modal="true" aria-label="Confirm plan" className={`relative w-full max-w-sm ${CARD} p-6`} initial={reduce ? false : { opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }} transition={{ duration: 0.3, ease: EASE }}>
+            <div className="flex items-center gap-1.5 text-[#006E42]"><ShieldCheck className="h-4 w-4" /><span className="text-[11px] font-semibold uppercase tracking-[0.14em]">Secure checkout</span></div>
+            <h2 className="mt-2 text-[18px] font-bold tracking-tight text-[#0f3a26]">Confirm your plan</h2>
+            <p className="text-[12.5px] text-[#0f3a26]/60">Review and continue to payment. No cart, no extra steps.</p>
+
+            <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#f1f7f3] p-4 ring-1 ring-inset ring-[#0f3a26]/[0.06]">
+              <div>
+                <p className="text-[13.5px] font-bold text-[#0f3a26]">{offer.name}</p>
+                <p className="text-[11.5px] text-[#0f3a26]/55">{offer.tagline}</p>
+              </div>
+              <p className="text-[22px] font-bold tabular-nums text-[#0f3a26]">₹{offer.priceINR}</p>
+            </div>
+
+            {demo && <p className="mt-3 rounded-xl bg-[#c79a3d]/12 px-3 py-2 text-[11px] font-medium leading-snug text-[#9c7426]">Demo mode: no real charge. Add your Razorpay Key ID in lib/payments/razorpay.ts to take live payments.</p>}
+
+            <div className="mt-5 flex items-center gap-2">
+              <button onClick={() => !paying && onClose()} disabled={paying} className="rounded-xl px-4 py-2.5 text-[13px] font-medium text-[#0f3a26]/60 transition hover:text-[#0f3a26] disabled:opacity-40">Cancel</button>
+              <button onClick={() => onConfirm(plan)} disabled={paying} className="ml-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#006E42] px-5 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#005634] disabled:opacity-60">
+                {paying ? <><RefreshCw className="h-4 w-4 animate-spin" />Processing</> : <>Confirm and pay ₹{offer.priceINR}</>}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function PaidSuccessModal({ info, onClose }: { info: { plan: PlanKind; paymentId: string } | null; onClose: () => void }) {
+  const reduce = useReducedMotion();
+  useEffect(() => {
+    if (!info) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
+  }, [info, onClose]);
+
+  const offer = info ? PLANS[info.plan] : null;
+
+  return (
+    <AnimatePresence>
+      {info && offer && (
+        <motion.div className="fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+          <div className="absolute inset-0 bg-[#0f3a26]/50" onClick={onClose} aria-hidden />
+          <motion.div role="dialog" aria-modal="true" aria-label="Payment successful" className={`relative w-full max-w-sm ${CARD} p-6 text-center`} initial={reduce ? false : { opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }} transition={{ duration: 0.3, ease: EASE }}>
+            <motion.span initial={reduce ? false : { scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4, ease: EASE }} className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#006E42]/12 text-[#006E42]"><CheckCircle2 className="h-9 w-9" /></motion.span>
+            <h2 className="mt-4 text-[19px] font-bold tracking-tight text-[#0f3a26]">Payment successful</h2>
+            <p className="mt-1 text-[13px] leading-relaxed text-[#0f3a26]/65">You paid <span className="font-semibold text-[#0f3a26]">₹{offer.priceINR}</span> for the {offer.name}. Your plan is now active.</p>
+            <p className="mx-auto mt-3 inline-block rounded-lg bg-[#f1f7f3] px-3 py-1.5 text-[10.5px] font-medium text-[#0f3a26]/50 ring-1 ring-inset ring-[#0f3a26]/[0.06]">Payment ID: {info.paymentId}</p>
+            <button onClick={onClose} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006E42] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#005634]">View my plan<ArrowRight className="h-4 w-4" /></button>
           </motion.div>
         </motion.div>
       )}
