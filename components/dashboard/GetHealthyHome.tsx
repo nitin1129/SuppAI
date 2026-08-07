@@ -15,11 +15,13 @@ import {
   Droplet,
   Dumbbell,
   FileText,
+  Film,
   Flame,
   Lock,
   Minus,
   Moon,
   Pencil,
+  Play,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -39,13 +41,11 @@ import { useEffect, useRef, useState } from "react";
 import { HealthTools } from "@/components/dashboard/HealthTools";
 import {
   DAY_CALORIE_TARGET,
-  RECIPES,
   WEEK_PLAN,
   type Achievements,
   type BlockType,
   type DayBlock,
   type PlanState,
-  type Recipe,
   type RoutineItem,
   activatePlan,
   addDayBlock,
@@ -62,6 +62,7 @@ import {
   updateDayBlock,
 } from "@/lib/gethealthy/service";
 import { FOODS, findFood } from "@/lib/gethealthy/foods";
+import { DIETS, DIET_META, fetchMeals, youtubeId, type Diet, type Meal } from "@/lib/meals/service";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const CARD = "rounded-3xl bg-white shadow-[0_2px_4px_-2px_rgba(15,58,38,0.08),0_16px_36px_-20px_rgba(15,58,38,0.30)] ring-1 ring-[#0f3a26]/10";
@@ -151,7 +152,7 @@ export function GetHealthyHome() {
   const [routine, setRoutine] = useState<RoutineItem[]>([]);
   const [ach, setAch] = useState<Achievements | null>(null);
   const [proc, setProc] = useState<{ active: boolean; step: number }>({ active: false, step: 0 });
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [recipe, setRecipe] = useState<Meal | null>(null);
   const [add, setAdd] = useState<AddInit | null>(null);
   const [editMeal, setEditMeal] = useState<DayBlock | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -250,7 +251,7 @@ function Heading({ label, title, locked, action }: { label: string; title: strin
 
 /* ============================================================= EMPTY ====== */
 
-function EmptyPlan({ onBrowse, onFile, onSample, onOpenRecipe }: { onBrowse: () => void; onFile: (f?: File | null) => void; onSample: () => void; onOpenRecipe: (r: Recipe) => void }) {
+function EmptyPlan({ onBrowse, onFile, onSample, onOpenRecipe }: { onBrowse: () => void; onFile: (f?: File | null) => void; onSample: () => void; onOpenRecipe: (r: Meal) => void }) {
   return (
     <div className="space-y-8">
       <Stagger i={0}><UploadSpotlight onBrowse={onBrowse} onFile={onFile} onSample={onSample} /></Stagger>
@@ -374,7 +375,7 @@ function ActivePlan(props: {
   state: PlanState; doneIds: string[]; blocks: DayBlock[]; routine: RoutineItem[]; ach: Achievements | null;
   onToggle: (id: string) => void; onRemoveBlock: (id: string) => void; onRemoveRoutine: (id: string) => void;
   onEditMeal: (b: DayBlock) => void;
-  onOpenRecipe: (r: Recipe) => void; onAdd: (init: AddInit) => void; onBrowse: () => void; onReset: () => void;
+  onOpenRecipe: (r: Meal) => void; onAdd: (init: AddInit) => void; onBrowse: () => void; onReset: () => void;
   onDownloadDay: () => void; onDownloadWeek: () => void;
 }) {
   const { state, doneIds, blocks, routine, ach, onToggle, onRemoveBlock, onRemoveRoutine, onEditMeal, onOpenRecipe, onAdd, onBrowse, onReset, onDownloadDay, onDownloadWeek } = props;
@@ -695,10 +696,14 @@ function WeeklyPlanCard({ today, routine, onAddRoutine, onRemoveRoutine, onDownl
 
 /* ============================================================= RECIPES ==== */
 
-function RecipeRail({ onOpen }: { onOpen: (r: Recipe) => void }) {
+function RecipeRail({ onOpen }: { onOpen: (r: Meal) => void }) {
   const reduce = useReducedMotion();
   const scroller = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ left: false, right: true });
+  const [meals, setMeals] = useState<Meal[] | null>(null);
+  const [diet, setDiet] = useState<"all" | Diet>("all");
+
+  useEffect(() => { fetchMeals().then(setMeals); }, []);
 
   function update() {
     const el = scroller.current;
@@ -711,66 +716,99 @@ function RecipeRail({ onOpen }: { onOpen: (r: Recipe) => void }) {
     if (!el) return;
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, []);
+  }, [meals, diet]);
   const scrollBy = (dir: number) => scroller.current?.scrollBy({ left: dir * 340, behavior: "smooth" });
 
-  return (
-    <div className="relative">
-      <div ref={scroller} onScroll={update} className="no-scrollbar -mx-1 flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pb-2">
-      {RECIPES.map((r, i) => (
-        <motion.button
-          key={r.id}
-          onClick={() => onOpen(r)}
-          initial={reduce ? false : { opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: EASE, delay: reduce ? 0 : i * 0.05 }}
-          className={`group w-[300px] shrink-0 snap-start overflow-hidden text-left ${CARD} transition hover:ring-[#006E42]/30`}
-        >
-          <div className="relative h-44 overflow-hidden">
-            <span className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${r.image})` }} aria-hidden />
-            <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold text-[#006E42] backdrop-blur">{r.tag}</span>
-            <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold text-[#0f3a26] backdrop-blur"><Timer className="h-3 w-3" />{r.timeMins}m</span>
-          </div>
-          <div className="p-4">
-            <p className="text-[14.5px] font-bold text-[#0f3a26]">{r.name}</p>
-            <div className="mt-2 flex items-center gap-3 text-[12px] text-[#0f3a26]/60">
-              <span className="inline-flex items-center gap-1"><Flame className="h-3.5 w-3.5 text-[#c79a3d]" />{r.kcal}</span>
-              <span className="inline-flex items-center gap-1"><Dumbbell className="h-3.5 w-3.5 text-[#006E42]" />{r.protein}g</span>
-              <span className="ml-auto inline-flex items-center gap-1 font-semibold text-[#006E42]">Recipe<ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span>
-            </div>
-          </div>
-        </motion.button>
-      ))}
-      </div>
+  const available = new Set((meals ?? []).map((m) => m.diet));
+  const chips = DIETS.filter((d) => available.has(d.key));
+  const shown = (meals ?? []).filter((m) => diet === "all" || m.diet === diet);
 
-      {/* scroll arrows */}
-      <button
-        onClick={() => scrollBy(-1)}
-        aria-label="Scroll left"
-        className={`absolute left-1 top-[88px] hidden h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white text-[#0f3a26] shadow-[0_6px_16px_-6px_rgba(15,58,38,0.4)] ring-1 ring-[#0f3a26]/10 transition hover:text-[#006E42] sm:grid ${edges.left ? "opacity-100" : "pointer-events-none opacity-0"}`}
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => scrollBy(1)}
-        aria-label="Scroll right"
-        className={`absolute right-1 top-[88px] hidden h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white text-[#0f3a26] shadow-[0_6px_16px_-6px_rgba(15,58,38,0.4)] ring-1 ring-[#0f3a26]/10 transition hover:text-[#006E42] sm:grid ${edges.right ? "opacity-100" : "pointer-events-none opacity-0"}`}
-      >
-        <ChevronRight className="h-4 w-4" />
-      </button>
+  if (meals && meals.length === 0) {
+    return <div className="rounded-2xl bg-[#f1f7f3] px-4 py-8 text-center text-[13px] text-[#0f3a26]/55 ring-1 ring-inset ring-[#0f3a26]/[0.06]">No meal suggestions yet.</div>;
+  }
+
+  return (
+    <div>
+      {/* diet filter */}
+      {chips.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <button onClick={() => setDiet("all")} className={`rounded-full px-3 py-1 text-[12px] font-semibold transition ${diet === "all" ? "bg-[#006E42] text-white" : "bg-white text-[#0f3a26]/65 ring-1 ring-[#0f3a26]/10 hover:ring-[#006E42]/30"}`}>All</button>
+          {chips.map((d) => (
+            <button key={d.key} onClick={() => setDiet(d.key)} className={`rounded-full px-3 py-1 text-[12px] font-semibold transition ${diet === d.key ? "bg-[#006E42] text-white" : "bg-white text-[#0f3a26]/65 ring-1 ring-[#0f3a26]/10 hover:ring-[#006E42]/30"}`}>{d.label}</button>
+          ))}
+        </div>
+      )}
+
+      <div className="relative">
+        <div ref={scroller} onScroll={update} className="no-scrollbar -mx-1 flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pb-2">
+        {!meals
+          ? Array.from({ length: 4 }).map((_, i) => <div key={i} className={`h-[268px] w-[300px] shrink-0 animate-pulse ${CARD}`} />)
+          : shown.map((r, i) => {
+              const dm = DIET_META[r.diet];
+              const hasVideo = !!youtubeId(r.youtubeUrl);
+              return (
+                <motion.button
+                  key={r.id}
+                  onClick={() => onOpen(r)}
+                  initial={reduce ? false : { opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: EASE, delay: reduce ? 0 : Math.min(i, 6) * 0.05 }}
+                  className={`group w-[300px] shrink-0 snap-start overflow-hidden text-left ${CARD} transition hover:ring-[#006E42]/30`}
+                >
+                  <div className="relative h-44 overflow-hidden">
+                    <span className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${r.image})` }} aria-hidden />
+                    <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold text-[#006E42] backdrop-blur">{r.tag}</span>
+                    <span className={`absolute left-3 bottom-3 rounded-full px-2 py-0.5 text-[10px] font-semibold ${dm.cls}`}>{dm.label}</span>
+                    {hasVideo && <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm"><Film className="h-3 w-3" />Video</span>}
+                    <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold text-[#0f3a26] backdrop-blur"><Timer className="h-3 w-3" />{r.timeMins}m</span>
+                  </div>
+                  <div className="p-4">
+                    <p className="line-clamp-1 text-[14.5px] font-bold text-[#0f3a26]">{r.name}</p>
+                    <div className="mt-2 flex items-center gap-3 text-[12px] text-[#0f3a26]/60">
+                      <span className="inline-flex items-center gap-1"><Flame className="h-3.5 w-3.5 text-[#c79a3d]" />{r.kcal}</span>
+                      <span className="inline-flex items-center gap-1"><Dumbbell className="h-3.5 w-3.5 text-[#006E42]" />{r.protein}g</span>
+                      <span className="ml-auto inline-flex items-center gap-1 font-semibold text-[#006E42]">Recipe<ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span>
+                    </div>
+                  </div>
+                </motion.button>
+              );
+            })}
+        </div>
+
+        {/* scroll arrows */}
+        <button
+          onClick={() => scrollBy(-1)}
+          aria-label="Scroll left"
+          className={`absolute left-1 top-[88px] hidden h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white text-[#0f3a26] shadow-[0_6px_16px_-6px_rgba(15,58,38,0.4)] ring-1 ring-[#0f3a26]/10 transition hover:text-[#006E42] sm:grid ${edges.left ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => scrollBy(1)}
+          aria-label="Scroll right"
+          className={`absolute right-1 top-[88px] hidden h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white text-[#0f3a26] shadow-[0_6px_16px_-6px_rgba(15,58,38,0.4)] ring-1 ring-[#0f3a26]/10 transition hover:text-[#006E42] sm:grid ${edges.right ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
 
-function RecipeModal({ recipe, onClose, onLog, canLog }: { recipe: Recipe | null; onClose: () => void; onLog: (r: Recipe) => void; canLog: boolean }) {
+function RecipeModal({ recipe, onClose, onLog, canLog }: { recipe: Meal | null; onClose: () => void; onLog: (r: Meal) => void; canLog: boolean }) {
   const reduce = useReducedMotion();
+  const [showVideo, setShowVideo] = useState(false);
   useEffect(() => {
     if (!recipe) return;
+    setShowVideo(false);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
   }, [recipe, onClose]);
+
+  const vid = youtubeId(recipe?.youtubeUrl);
+  const dm = recipe ? DIET_META[recipe.diet] : null;
 
   return (
     <AnimatePresence>
@@ -778,15 +816,31 @@ function RecipeModal({ recipe, onClose, onLog, canLog }: { recipe: Recipe | null
         <motion.div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
           <div className="absolute inset-0 bg-[#0f3a26]/45" onClick={onClose} aria-hidden />
           <motion.div role="dialog" aria-modal="true" aria-label={recipe.name} className={`relative flex max-h-[86vh] w-full max-w-lg flex-col ${CARD} overflow-hidden`} initial={reduce ? false : { opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }} transition={{ duration: 0.3, ease: EASE }}>
-            <div className="relative h-44 shrink-0">
-              <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${recipe.image})` }} aria-hidden />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0f3a26]/70 to-transparent" />
-              <button onClick={onClose} aria-label="Close" className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg bg-white/85 text-[#0f3a26] backdrop-blur transition hover:bg-white"><X className="h-4 w-4" /></button>
-              <div className="absolute bottom-3 left-4 right-4">
-                <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold text-[#006E42]">{recipe.tag}</span>
-                <h2 className="mt-1.5 text-[19px] font-bold text-white">{recipe.name}</h2>
+            {showVideo && vid ? (
+              <div className="relative aspect-video w-full shrink-0 bg-black">
+                <iframe src={`https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0`} title={recipe.name} className="h-full w-full" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+                <button onClick={() => setShowVideo(false)} aria-label="Back to photo" className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg bg-white/85 text-[#0f3a26] backdrop-blur transition hover:bg-white"><X className="h-4 w-4" /></button>
               </div>
-            </div>
+            ) : (
+              <div className="relative h-44 shrink-0">
+                <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${recipe.image})` }} aria-hidden />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0f3a26]/70 to-transparent" />
+                <button onClick={onClose} aria-label="Close" className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg bg-white/85 text-[#0f3a26] backdrop-blur transition hover:bg-white"><X className="h-4 w-4" /></button>
+                {vid && (
+                  <button onClick={() => setShowVideo(true)} aria-label="Play recipe video" className="absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-[12.5px] font-semibold text-[#0f3a26] shadow-lg backdrop-blur transition hover:bg-white">
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-[#006E42] text-white"><Play className="h-3 w-3 translate-x-[1px] fill-current" /></span>
+                    Watch recipe
+                  </button>
+                )}
+                <div className="absolute bottom-3 left-4 right-4">
+                  <div className="flex items-center gap-1.5">
+                    <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold text-[#006E42]">{recipe.tag}</span>
+                    {dm && <span className={`rounded-full px-2 py-1 text-[10.5px] font-semibold ${dm.cls}`}>{dm.label}</span>}
+                  </div>
+                  <h2 className="mt-1.5 text-[19px] font-bold text-white">{recipe.name}</h2>
+                </div>
+              </div>
+            )}
 
             <div className="no-scrollbar flex-1 overflow-y-auto p-5">
               <div className="flex flex-wrap gap-2">
@@ -794,6 +848,12 @@ function RecipeModal({ recipe, onClose, onLog, canLog }: { recipe: Recipe | null
                   <span key={k} className="inline-flex items-center gap-1.5 rounded-lg bg-[#f1f7f3] px-2.5 py-1.5 text-[11.5px] font-semibold text-[#0f3a26] ring-1 ring-inset ring-[#0f3a26]/[0.08]"><m.i className={`h-3.5 w-3.5 ${m.c}`} />{m.t}</span>
                 ))}
               </div>
+
+              {recipe.description && <p className="mt-4 text-[13px] leading-relaxed text-[#0f3a26]/70">{recipe.description}</p>}
+
+              {vid && !showVideo && (
+                <button onClick={() => setShowVideo(true)} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#c14040]/8 px-3.5 py-2 text-[12.5px] font-semibold text-[#c14040] transition hover:bg-[#c14040]/12"><Film className="h-3.5 w-3.5" />Watch the recipe video</button>
+              )}
 
               <div className="mt-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#006E42]/70">Ingredients</p>

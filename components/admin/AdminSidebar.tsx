@@ -11,6 +11,7 @@ import {
   Package,
   Stethoscope,
   Store,
+  UtensilsCrossed,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -44,6 +45,12 @@ const items: Item[] = [
     label: "Products",
     icon: Package,
     match: (p) => p.startsWith("/admin/products"),
+  },
+  {
+    href: "/admin/meals",
+    label: "Meals",
+    icon: UtensilsCrossed,
+    match: (p) => p.startsWith("/admin/meals"),
   },
   {
     href: "/admin/orders",
