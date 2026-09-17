@@ -12,7 +12,7 @@ import {
   ACTIVITY_LEVELS, DIET_TYPES, GENDERS, generateMealPlan, mealPlanPdfUrl, parseCalories,
   type ActivityLevel, type ApiGender, type DietType, type MealPlanResult, type PlanType,
 } from "@/lib/api/meals";
-import { ensureApiUser } from "@/lib/api/user";
+import { ensureApiUser, renewApiUser } from "@/lib/api/user";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { markScheduled, readSavedPlan, savePlan, type PlanInputs } from "@/lib/meals/generated-plan";
 import {
@@ -95,23 +95,31 @@ export function MealPlanBuilder({ onUseDay }: Props) {
     try {
       const profile = await fetchProfile();
       const user = await ensureApiUser(profile.name, profile.email);
-      const plan = await generateMealPlan(
-        {
-          user_id: user.userId,
-          name: profile.name,
-          age: Math.round(ageN),
-          gender: inputs.gender,
-          height: heightN,
-          weight: weightN,
-          diet: inputs.diet,
-          activity_level: inputs.activity,
-          food_allergies: inputs.allergies.split(",").map((a) => a.trim()).filter(Boolean),
-          health_goals: inputs.goals,
-          disease: [],
-          supplement_preferences: [],
-        },
-        inputs.planType,
-      );
+      const profileFor = (userId: string) => ({
+        user_id: userId,
+        name: profile.name,
+        age: Math.round(ageN),
+        gender: inputs.gender,
+        height: heightN,
+        weight: weightN,
+        diet: inputs.diet,
+        activity_level: inputs.activity,
+        food_allergies: inputs.allergies.split(",").map((a) => a.trim()).filter(Boolean),
+        health_goals: inputs.goals,
+        disease: [],
+        supplement_preferences: [],
+      });
+
+      let plan;
+      try {
+        plan = await generateMealPlan(profileFor(user.userId), inputs.planType);
+      } catch (e) {
+        // The backend forgets ids when its data is reset. Register again and retry once.
+        if (!(e instanceof Error) || !/not found/i.test(e.message)) throw e;
+        const fresh = await renewApiUser(profile.name, profile.email);
+        plan = await generateMealPlan(profileFor(fresh.userId), inputs.planType);
+      }
+
       savePlan(plan, inputs);
       setResult(plan);
       setScheduledDay(null);
