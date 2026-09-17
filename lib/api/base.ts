@@ -1,9 +1,16 @@
 "use client";
 
-/* Shared plumbing for the health backend. The base URL comes from the env so
-   it can change when a domain is set (see NEXT_PUBLIC_API_BASE_URL). */
+/* Shared plumbing for the health backend.
 
-export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "");
+   By default calls go to this app's own origin at /api/upstream, which
+   next.config forwards to the backend. That keeps the browser on one origin,
+   so a site served over https can still reach a backend that speaks plain
+   http. Set NEXT_PUBLIC_API_BASE_URL to call the backend directly instead
+   (handy in local development). */
+
+const configured = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").trim();
+
+export const API_BASE = (configured || "/api/upstream").replace(/\/+$/, "");
 
 /** Absolute URL for a path the API handed us, e.g. a download link. */
 export function apiUrl(path: string): string {
@@ -14,7 +21,6 @@ type Options = { method?: "GET" | "POST"; body?: unknown };
 
 export async function apiRequest<T>(path: string, options: Options = {}): Promise<T> {
   const { method = "GET", body } = options;
-  if (!API_BASE) throw new Error("API base URL is not set (NEXT_PUBLIC_API_BASE_URL).");
 
   let res: Response;
   try {

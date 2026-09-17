@@ -52,6 +52,16 @@ nano .env.local      # set NEXT_PUBLIC_RAZORPAY_KEY_ID to your rzp_live_... key
 
 Without it, the plan checkout falls back to demo mode (no real charge).
 
+Set `API_UPSTREAM_URL` to the health backend origin, for example
+`http://72.61.238.140:8010`. The browser never calls that address: it calls
+this app at `/api/upstream/...` and the server forwards the request. That is
+what lets an https site talk to a backend that speaks plain http.
+
+Do **not** set `NEXT_PUBLIC_API_BASE_URL` in production. It makes the browser
+call the backend directly, which an https page cannot do: Chrome either
+blocks the call as mixed content or upgrades it to https, where the backend
+has no certificate and the request fails with `ERR_SSL_PROTOCOL_ERROR`.
+
 ## 4. Install and build
 
 ```bash
