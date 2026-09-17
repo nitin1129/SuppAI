@@ -13,6 +13,8 @@ import { registerUser } from "./meals";
    delivers to jane@gmail.com. */
 
 const LS_API_USER = "suppai.api.user.v1";
+// Addresses the backend has already claimed, so we stop asking for them.
+const LS_TAKEN = "suppai.api.taken.v1";
 
 export type ApiUser = { userId: string; name: string; email: string };
 
@@ -45,6 +47,22 @@ function store(user: ApiUser) {
   }
 }
 
+function isKnownTaken(email: string): boolean {
+  try {
+    return localStorage.getItem(LS_TAKEN) === email;
+  } catch {
+    return false;
+  }
+}
+
+function rememberTaken(email: string) {
+  try {
+    localStorage.setItem(LS_TAKEN, email);
+  } catch {
+    /* the retry still works, it just happens again next time */
+  }
+}
+
 /** jane@gmail.com -> jane+suppai-4f2a9c1e@gmail.com */
 function taggedEmail(email: string): string {
   const tag = `suppai-${Math.random().toString(36).slice(2, 10)}`;
@@ -61,13 +79,15 @@ export async function ensureApiUser(name: string, email: string): Promise<ApiUse
   const existing = readApiUser();
   if (existing) return existing;
 
-  let address = email;
+  // Once an address is known to be claimed, go straight to a tagged one.
+  let address = isKnownTaken(email) ? taggedEmail(email) : email;
   let res;
   try {
     res = await registerUser(name, address);
   } catch (e) {
     if (!isTaken(e)) throw e;
     // The address is spoken for and cannot be recovered, so tag it and retry.
+    rememberTaken(address);
     address = taggedEmail(email);
     res = await registerUser(name, address);
   }
