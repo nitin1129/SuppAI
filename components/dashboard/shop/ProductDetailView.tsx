@@ -135,7 +135,7 @@ export function ProductDetailView({ product: p }: { product: ProductDetail }) {
   );
 
   return (
-    <div className="px-10 pb-14 pt-2">
+    <div className="px-4 pb-12 pt-2 md:px-10 md:pb-14">
       <Link
         href={category ? `/dashboard/shop/${category.slug}` : "/dashboard/shop"}
         className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[#0f3a26]/60 transition hover:text-[#006E42]"
@@ -769,7 +769,7 @@ function ReviewsBlock({ product: p }: { product: ProductDetail }) {
 
       <div className="mt-2 grid grid-cols-1 gap-10 lg:grid-cols-[260px_1fr]">
         <div>
-          <p className="text-[44px] font-bold leading-none tabular-nums text-[#0f3a26]">
+          <p className="text-[32px] font-bold leading-none tabular-nums text-[#0f3a26] sm:text-[44px]">
             {p.rating.toFixed(1)}
             <span className="ml-1 text-[16px] font-medium text-[#0f3a26]/55">
               /5

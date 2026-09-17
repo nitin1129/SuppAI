@@ -59,7 +59,7 @@ export function CategoryView({ category }: { category: ShopCategory }) {
   }, [all, activeTag, query, sort]);
 
   return (
-    <div className="px-10 pb-14 pt-2">
+    <div className="px-4 pb-12 pt-2 md:px-10 md:pb-14">
       <Link
         href="/dashboard/shop"
         className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[#0f3a26]/60 transition hover:text-[#006E42]"

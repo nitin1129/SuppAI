@@ -1,102 +1,65 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { Heart, Plus, Star } from "lucide-react";
-import Image from "next/image";
+import { Check, Heart, Plus, Star } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import type { ShopProduct } from "@/lib/shop/types";
+
+import { ProductVisual } from "./Packshot";
+import { percentOff, useProductActions } from "./useProductActions";
 
 type Props = {
   product: ShopProduct;
   delay?: number;
 };
 
-const badgeStyle: Record<
-  NonNullable<ShopProduct["badge"]>,
-  { bg: string; fg: string }
-> = {
-  Bestseller: { bg: "#F1623A", fg: "#ffffff" },
-  "Editor's pick": { bg: "#0f3a26", fg: "#ffffff" },
-  New: { bg: "#006E42", fg: "#ffffff" },
+const badgeStyle: Record<NonNullable<ShopProduct["badge"]>, string> = {
+  Bestseller: "bg-[#0f3a26] text-[#9af2c4]",
+  "Editor's pick": "bg-[#f5ecd6] text-[#7a5a1e]",
+  New: "bg-[#006E42] text-white",
 };
 
 const EASE_OUT_QUART = [0.22, 1, 0.36, 1] as const;
 
 export function ProductCard({ product: p, delay = 0 }: Props) {
-  const off = Math.round(((p.mrp - p.price) / p.mrp) * 100);
-  const save = p.mrp - p.price;
-  const badge = p.badge ? badgeStyle[p.badge] : null;
+  const off = percentOff(p);
   const reduceMotion = useReducedMotion();
-  const [wished, setWished] = useState(false);
+  const { add, justAdded, inCart, wished, toggleWish: toggle } = useProductActions(p);
   const [popKey, setPopKey] = useState(0);
+  const href = `/dashboard/shop/${p.categoryId}/${p.id}`;
+
+  function toggleWish() {
+    toggle();
+    setPopKey((k) => k + 1);
+  }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay, ease: EASE_OUT_QUART }}
-      whileHover={reduceMotion ? undefined : { y: -3 }}
-      whileTap={{ y: 0 }}
-      style={{ willChange: "transform" }}
-      className="group h-full"
+      transition={{ duration: 0.4, delay, ease: EASE_OUT_QUART }}
+      className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-[0_1px_2px_-1px_rgba(15,58,38,0.05)] ring-1 ring-inset ring-[#0f3a26]/8 transition-shadow duration-300 ease-out focus-within:ring-2 focus-within:ring-[#006E42]/40 hover:shadow-[0_2px_4px_-2px_rgba(15,58,38,0.06),0_18px_36px_-22px_rgba(0,110,66,0.25)]"
     >
-      <Link
-        href={`/dashboard/shop/${p.categoryId}/${p.id}`}
-        className="flex h-full flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-inset ring-[#0f3a26]/8 shadow-[0_1px_2px_-1px_rgba(15,58,38,0.04)] transition-shadow duration-300 ease-out hover:shadow-[0_2px_4px_-2px_rgba(15,58,38,0.06),0_18px_36px_-22px_rgba(0,110,66,0.22)]"
-      >
-      {/* Image */}
-      <div
-        className="relative aspect-[4/3] overflow-hidden"
-        style={{ background: p.swatch }}
-      >
-        {p.image && (
-          <Image
-            src={p.image}
-            alt={p.name}
-            fill
-            sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 280px"
-            className="object-cover transition-transform duration-500 ease-out motion-safe:group-hover:scale-[1.03]"
-          />
-        )}
+      {/* Visual */}
+      <div className="relative">
+        <ProductVisual product={p} image={p.image} className="aspect-square w-full" />
 
-        {badge && (
-          <motion.span
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: delay + 0.1, ease: EASE_OUT_QUART }}
-            className="absolute left-3 top-3 rounded-full px-2.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider shadow-[0_4px_10px_-4px_rgba(0,0,0,0.25)]"
-            style={{ background: badge.bg, color: badge.fg }}
-          >
+        {p.badge && (
+          <span className={`absolute left-2.5 top-2.5 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider sm:left-3 sm:top-3 sm:text-[9.5px] ${badgeStyle[p.badge]}`}>
             {p.badge}
-          </motion.span>
+          </span>
         )}
 
-        {off > 0 && (
-          <motion.span
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: delay + 0.14, ease: EASE_OUT_QUART }}
-            className="absolute right-3 top-3 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-bold tabular-nums text-[#0f3a26] ring-1 ring-[#0f3a26]/8 backdrop-blur-sm"
-          >
-            {off}% off
-          </motion.span>
-        )}
-
-        {/* Wishlist: press feedback + scale pop on toggle */}
         <motion.button
+          type="button"
           whileTap={reduceMotion ? undefined : { scale: 0.9 }}
           transition={{ duration: 0.12, ease: EASE_OUT_QUART }}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setWished((v) => !v);
-            setPopKey((k) => k + 1);
-          }}
-          aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
+          onClick={toggleWish}
+          aria-label={wished ? `Remove ${p.name} from wishlist` : `Save ${p.name} to wishlist`}
           aria-pressed={wished}
-          className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-[#0f3a26]/55 shadow-[0_6px_14px_-8px_rgba(15,58,38,0.4)] ring-1 ring-[#0f3a26]/8 backdrop-blur-sm transition-colors duration-200 ease-out hover:text-[#F1623A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F1623A]/40"
+          className="absolute right-2 top-2 z-10 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-[#0f3a26]/55 shadow-[0_6px_14px_-8px_rgba(15,58,38,0.4)] ring-1 ring-[#0f3a26]/8 transition-colors duration-200 hover:text-[#c14040] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c14040]/40 sm:right-2.5 sm:top-2.5"
         >
           <motion.span
             key={popKey}
@@ -105,83 +68,83 @@ export function ProductCard({ product: p, delay = 0 }: Props) {
             transition={{ duration: 0.22, ease: EASE_OUT_QUART }}
             className="grid place-items-center"
           >
-            <Heart
-              className={`h-4 w-4 transition-colors duration-200 ${
-                wished ? "fill-[#F1623A] text-[#F1623A]" : ""
-              }`}
-            />
+            <Heart className={`h-4 w-4 transition-colors duration-200 ${wished ? "fill-[#c14040] text-[#c14040]" : ""}`} />
           </motion.span>
         </motion.button>
       </div>
 
-      {/* Meta */}
-      <div className="flex flex-1 flex-col p-5">
+      {/* Details */}
+      <div className="flex flex-1 flex-col p-3 sm:p-4">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-[#0f3a26]/45">
+          <p className="truncate text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[#0f3a26]/45 sm:text-[10.5px]">
             {p.brand}
           </p>
-          <span className="inline-flex items-center gap-1 text-[11px] text-[#0f3a26]/55">
-            <Star className="h-3 w-3 fill-[#F1623A] text-[#F1623A]" />
-            <span className="font-semibold text-[#0f3a26]">{p.rating}</span>
-            <span>({(p.reviews / 1000).toFixed(1)}k)</span>
+          <span className="hidden shrink-0 items-center gap-1 text-[11px] text-[#0f3a26]/55 sm:inline-flex">
+            <Star className="h-3 w-3 fill-[#c79a3d] text-[#c79a3d]" />
+            <span className="font-semibold tabular-nums text-[#0f3a26]">{p.rating}</span>
+            <span className="tabular-nums">({(p.reviews / 1000).toFixed(1)}k)</span>
           </span>
         </div>
 
-        <h4 className="mt-2 line-clamp-2 text-[15px] font-semibold leading-snug text-[#0f3a26]">
-          {p.name}
-        </h4>
+        <h3 className="mt-1 line-clamp-2 text-[13px] font-semibold leading-snug text-[#0f3a26] sm:text-[14.5px]">
+          {/* stretched link: the whole card opens the product, buttons stay separate */}
+          <Link href={href} className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
+            {p.name}
+          </Link>
+        </h3>
 
-        <p className="mt-1.5 line-clamp-2 text-[12.5px] leading-[1.55] text-[#0f3a26]/55">
-          {p.description}
-        </p>
+        <span className="mt-1 inline-flex items-center gap-1 text-[10.5px] text-[#0f3a26]/55 sm:hidden">
+          <Star className="h-3 w-3 fill-[#c79a3d] text-[#c79a3d]" />
+          <span className="font-semibold tabular-nums text-[#0f3a26]">{p.rating}</span>
+          <span className="tabular-nums">· {(p.reviews / 1000).toFixed(1)}k</span>
+        </span>
 
         {p.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {p.tags.slice(0, 3).map((t) => (
-              <span
-                key={t}
-                className="rounded-full bg-[#006E42]/[0.07] px-2 py-0.5 text-[10.5px] font-medium text-[#006E42]"
-              >
+          <div className="mt-2 hidden flex-wrap gap-1 sm:flex">
+            {p.tags.slice(0, 2).map((t) => (
+              <span key={t} className="rounded-full bg-[#006E42]/[0.07] px-2 py-0.5 text-[10.5px] font-medium text-[#006E42]">
                 {t}
               </span>
             ))}
           </div>
         )}
 
-        <div className="mt-auto flex items-end justify-between gap-3 border-t border-[#0f3a26]/8 pt-4">
-          <div>
-            <div className="flex items-baseline gap-2">
-              <p className="text-[20px] font-bold leading-none tabular-nums text-[#0f3a26]">
-                ₹{p.price.toLocaleString()}
-              </p>
+        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-baseline gap-x-1.5">
+              <span className="text-[16px] font-bold leading-none tabular-nums text-[#0f3a26] sm:text-[19px]">
+                ₹{p.price.toLocaleString("en-IN")}
+              </span>
               {off > 0 && (
-                <p className="text-[11.5px] tabular-nums text-[#0f3a26]/40 line-through">
-                  ₹{p.mrp.toLocaleString()}
-                </p>
+                <span className="text-[11px] tabular-nums text-[#0f3a26]/40 line-through">
+                  ₹{p.mrp.toLocaleString("en-IN")}
+                </span>
               )}
-            </div>
+            </p>
             {off > 0 && (
-              <p className="mt-1 text-[11px] font-semibold tabular-nums text-[#006E42]">
-                Save ₹{save.toLocaleString()}
+              <p className="mt-1 text-[10.5px] font-semibold tabular-nums text-[#9c7426] sm:text-[11px]">
+                {off}% off
               </p>
             )}
           </div>
+
           <motion.button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+            type="button"
+            onClick={add}
+            whileTap={reduceMotion ? undefined : { scale: 0.95 }}
             transition={{ duration: 0.12, ease: EASE_OUT_QUART }}
             aria-label={`Add ${p.name} to cart`}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#006E42] px-4 py-2.5 text-[12.5px] font-semibold text-white shadow-[0_8px_18px_-10px_rgba(0,110,66,0.55)] transition-colors duration-200 ease-out hover:bg-[#005634] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006E42]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+            className={`relative z-10 inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-xl text-[12.5px] font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006E42]/40 focus-visible:ring-offset-2 sm:w-auto sm:px-3.5 ${
+              justAdded
+                ? "bg-[#9af2c4] text-[#0f3a26]"
+                : "bg-[#006E42] text-white shadow-[0_8px_18px_-10px_rgba(0,110,66,0.55)] hover:bg-[#005634]"
+            }`}
           >
-            <Plus className="h-3.5 w-3.5" strokeWidth={3} />
-            Add
+            {justAdded ? <Check className="h-4 w-4" strokeWidth={3} /> : <Plus className="h-4 w-4" strokeWidth={3} />}
+            <span className="hidden sm:inline">{justAdded ? "Added" : inCart ? "Add more" : "Add"}</span>
           </motion.button>
         </div>
       </div>
-      </Link>
     </motion.div>
   );
 }
