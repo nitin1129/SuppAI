@@ -50,7 +50,7 @@ const habits = [
 
 export function OverviewView() {
   return (
-    <div className="px-10 pb-14 pt-2">
+    <div className="px-4 pb-12 pt-2 md:px-10 md:pb-14">
       {/* AI insight: not in a card. Just a strong typographic statement on the page. */}
       <motion.section
         initial={{ opacity: 0, y: 8 }}
@@ -62,7 +62,7 @@ export function OverviewView() {
           <Sparkles className="h-3 w-3" />
           Today&rsquo;s insight
         </div>
-        <h2 className="mt-4 text-[28px] font-semibold leading-[1.2] tracking-tight text-[#0f3a26]">
+        <h2 className="mt-4 text-[23px] font-semibold leading-[1.25] tracking-tight text-[#0f3a26] sm:text-[28px] sm:leading-[1.2]">
           Your Vitamin D dipped below range. A short morning walk in sunlight,
           and the D3 + K2 stack with breakfast, gets you back inside one week.
         </h2>

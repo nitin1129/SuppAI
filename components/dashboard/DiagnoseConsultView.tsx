@@ -16,9 +16,9 @@ export function DiagnoseConsultView() {
   if (mode === "consult") return <ConsultView onHome={() => setMode("hub")} />;
 
   return (
-    <div className="px-10 pb-14 pt-2">
+    <div className="px-4 pb-12 pt-2 md:px-10 md:pb-14">
       <div className="max-w-2xl">
-        <h2 className="text-[34px] font-semibold leading-[1.1] tracking-tight text-[#0f3a26]">
+        <h2 className="text-[25px] font-semibold leading-[1.15] tracking-tight text-[#0f3a26] sm:text-[34px] sm:leading-[1.1]">
           What do you need today?
         </h2>
         <p className="mt-2 text-[14px] leading-relaxed text-[#0f3a26]/60">

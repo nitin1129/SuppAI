@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 import type { AdminSession, AdminUser } from "./types";
 
@@ -85,17 +87,14 @@ export function useAdminSession(): {
   hydrated: boolean;
   refresh: () => void;
 } {
-  const [session, setSession] = useState<AdminSession | null>(null);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    setSession(read());
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
+  // Bumped by refresh() so the session is re-read from storage.
+  const [version, setVersion] = useState(0);
+  const session = useMemo(() => (hydrated && version >= 0 ? read() : null), [hydrated, version]);
 
   return {
     session,
     hydrated,
-    refresh: () => setSession(read()),
+    refresh: () => setVersion((v) => v + 1),
   };
 }

@@ -1,18 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useRandomPick } from "@/lib/hooks/useHydrated";
 
 type Props = {
   pool: string[];
 };
 
 export function RotatingTagline({ pool }: Props) {
-  const [line, setLine] = useState<string | null>(null);
-
-  useEffect(() => {
-    setLine(pool[Math.floor(Math.random() * pool.length)]);
-  }, [pool]);
+  const line = useRandomPick(pool);
 
   if (!line) return <div className="h-[34px]" aria-hidden />;
 

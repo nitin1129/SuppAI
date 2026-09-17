@@ -55,7 +55,7 @@ export default function CartPage() {
 
   if (!hydrated) {
     return (
-      <div className="px-10 py-8">
+      <div className="px-4 py-6 md:px-10 md:py-8">
         <div className="h-72 animate-pulse rounded-3xl bg-white ring-1 ring-[#0f3a26]/8" />
       </div>
     );
@@ -66,7 +66,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-10 px-10 py-8 lg:grid-cols-[1fr_360px]">
+    <div className="grid grid-cols-1 gap-6 px-4 py-6 md:gap-10 md:px-10 md:py-8 lg:grid-cols-[1fr_360px]">
       {/* Left: cart contents */}
       <div className="min-w-0 space-y-9">
         {oneTime.length > 0 && (
@@ -235,7 +235,7 @@ function EmptyCart() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE }}
-      className="mx-auto max-w-3xl px-10 py-16"
+      className="mx-auto max-w-3xl px-5 py-12 md:px-10 md:py-16"
     >
       <div className="flex items-start gap-5">
         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#006E42]/10 text-[#006E42]">

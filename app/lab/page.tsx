@@ -21,6 +21,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 import { useLabSession } from "@/lib/partner/auth";
 import {
@@ -49,26 +50,31 @@ export default function LabDashboardPage() {
   const [orders, setOrders] = useState<LabOrder[] | null>(null);
   const [tab, setTab] = useState<Tab>("today");
   const [selectedDate, setSelectedDate] = useState<string>(isoToday());
-  const [leave, setLeave] = useState<Record<string, string>>({});
+  const hydrated = useHydrated();
+  const storedLeave = useMemo<Record<string, string>>(() => {
+    if (!hydrated || !labId) return {};
+    try {
+      const raw = localStorage.getItem(`${LAB_LEAVE_KEY}.${labId}`);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }, [hydrated, labId]);
+  const [leaveEdit, setLeaveEdit] = useState<{ labId: string; leave: Record<string, string> } | null>(null);
+  const leave = leaveEdit && leaveEdit.labId === labId ? leaveEdit.leave : storedLeave;
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!labId) return;
     let alive = true;
     fetchLabOrders(labId).then((o) => alive && setOrders(o));
-    try {
-      const raw = localStorage.getItem(`${LAB_LEAVE_KEY}.${labId}`);
-      if (raw) setLeave(JSON.parse(raw));
-    } catch {
-      /* ignore */
-    }
     return () => {
       alive = false;
     };
   }, [labId]);
 
   function persistLeave(next: Record<string, string>) {
-    setLeave(next);
+    setLeaveEdit({ labId, leave: next });
     try {
       localStorage.setItem(`${LAB_LEAVE_KEY}.${labId}`, JSON.stringify(next));
     } catch {

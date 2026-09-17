@@ -4,11 +4,12 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
+
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 import type { CartItem, CartItemDraft, CartTotals } from "./types";
 
@@ -95,16 +96,14 @@ function computeTotals(items: CartItem[]): CartTotals {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    setItems(read());
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
+  // What storage held when the page loaded; local edits take over once made.
+  const stored = useMemo<CartItem[]>(() => (hydrated ? read() : []), [hydrated]);
+  const [edited, setEdited] = useState<CartItem[] | null>(null);
+  const items = edited ?? stored;
 
   const persist = useCallback((next: CartItem[]) => {
-    setItems(next);
+    setEdited(next);
     write(next);
   }, []);
 

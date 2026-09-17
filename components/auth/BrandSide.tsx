@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useRandomPick } from "@/lib/hooks/useHydrated";
 
 import type { WellnessTip } from "@/lib/wellness-tips";
 
@@ -14,13 +14,7 @@ type Props = {
 };
 
 export function BrandSide({ headline, subline, features, tips }: Props) {
-  const [tip, setTip] = useState<WellnessTip | null>(null);
-
-  useEffect(() => {
-    if (tips && tips.length > 0) {
-      setTip(tips[Math.floor(Math.random() * tips.length)]);
-    }
-  }, [tips]);
+  const tip: WellnessTip | null = useRandomPick(tips);
   return (
     <div className="relative hidden h-full min-h-screen overflow-hidden bg-gradient-to-br from-[#005634] via-[#006E42] to-[#008a53] lg:flex lg:flex-col">
       <div

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 import type { DoctorSession, LabSession, VendorSession } from "./types";
 
@@ -80,15 +82,11 @@ export function getDoctorSession(): DoctorSession | null {
 }
 
 export function useDoctorSession() {
-  const [session, setSession] = useState<DoctorSession | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useHydrated();
+  const [version, setVersion] = useState(0);
+  const session = useMemo(() => (hydrated && version >= 0 ? readDoctor() : null), [hydrated, version]);
 
-  useEffect(() => {
-    setSession(readDoctor());
-    setHydrated(true);
-  }, []);
-
-  return { session, hydrated, refresh: () => setSession(readDoctor()) };
+  return { session, hydrated, refresh: () => setVersion((v) => v + 1) };
 }
 
 /* ------------------------------- Lab ------------------------------- */
@@ -150,15 +148,11 @@ export function getLabSession(): LabSession | null {
 }
 
 export function useLabSession() {
-  const [session, setSession] = useState<LabSession | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useHydrated();
+  const [version, setVersion] = useState(0);
+  const session = useMemo(() => (hydrated && version >= 0 ? readLab() : null), [hydrated, version]);
 
-  useEffect(() => {
-    setSession(readLab());
-    setHydrated(true);
-  }, []);
-
-  return { session, hydrated, refresh: () => setSession(readLab()) };
+  return { session, hydrated, refresh: () => setVersion((v) => v + 1) };
 }
 
 /* ------------------------------- Vendor ------------------------------- */
@@ -216,13 +210,9 @@ export function getVendorSession(): VendorSession | null {
 }
 
 export function useVendorSession() {
-  const [session, setSession] = useState<VendorSession | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useHydrated();
+  const [version, setVersion] = useState(0);
+  const session = useMemo(() => (hydrated && version >= 0 ? readVendor() : null), [hydrated, version]);
 
-  useEffect(() => {
-    setSession(readVendor());
-    setHydrated(true);
-  }, []);
-
-  return { session, hydrated, refresh: () => setSession(readVendor()) };
+  return { session, hydrated, refresh: () => setVersion((v) => v + 1) };
 }

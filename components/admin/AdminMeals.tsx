@@ -201,8 +201,16 @@ function MealForm({ draft, onClose, onSave, onDelete }: { draft: Draft | null; o
   const [saving, setSaving] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
 
+  // Load each newly opened draft into the form.
+  const [seenDraft, setSeenDraft] = useState<Draft | null>(null);
+  if (draft && draft !== seenDraft) {
+    setSeenDraft(draft);
+    setD(draft);
+    setSaving(false);
+    setConfirmDel(false);
+  }
+
   useEffect(() => {
-    if (draft) { setD(draft); setSaving(false); setConfirmDel(false); }
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     if (draft) document.body.style.overflow = "hidden";

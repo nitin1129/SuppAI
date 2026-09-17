@@ -26,7 +26,7 @@ export default function SignUpPage() {
         ]}
       />
 
-      <div className="flex h-screen flex-col overflow-hidden px-10 py-10 sm:px-16">
+      <div className="flex h-screen flex-col overflow-hidden px-5 py-8 sm:px-16 sm:py-10">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

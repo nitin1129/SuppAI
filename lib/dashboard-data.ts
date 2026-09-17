@@ -65,6 +65,8 @@ export type Section = {
   icon: LucideIcon;
   href: string;
   features: Feature[];
+  /** Reachable by link, but kept out of the sidebar and bottom bar. */
+  navHidden?: boolean;
 };
 
 export const sectionHref = (id: string) =>
@@ -125,8 +127,8 @@ const SECTIONS_RAW: Omit<Section, "href">[] = [
   {
     id: "plans",
     number: "5.0",
-    title: "Plans & Membership",
-    blurb: "Manage your subscription and unlock more.",
+    title: "Plans & Bookings",
+    blurb: "Membership, insurance, orders, and appointments.",
     icon: Crown,
     features: [
       { id: "current", label: "Current plan", description: "See benefits and usage of your active plan.", icon: ShieldCheck },
@@ -142,9 +144,10 @@ const SECTIONS_RAW: Omit<Section, "href">[] = [
   {
     id: "track",
     number: "6.0",
-    title: "Track & Manage",
-    blurb: "Everything you measure, in one timeline.",
+    title: "Orders & Appointments",
+    blurb: "Your orders, subscriptions, and upcoming visits.",
     icon: FileBarChart,
+    navHidden: true,
     features: [
       { id: "timeline", label: "Health timeline", description: "Reports, visits, and milestones over time.", icon: History },
       { id: "symptoms-log", label: "Symptoms log", description: "Daily diary your doctor can review.", icon: ClipboardList },
@@ -159,8 +162,8 @@ const SECTIONS_RAW: Omit<Section, "href">[] = [
   {
     id: "account",
     number: "7.0",
-    title: "Account",
-    blurb: "Your profile, preferences, and privacy.",
+    title: "Account & Support",
+    blurb: "Your profile, wallet, and help when you need it.",
     icon: User,
     features: [
       { id: "profile", label: "Profile", description: "Name, photo, contact info, and bio.", icon: User },
@@ -176,9 +179,10 @@ const SECTIONS_RAW: Omit<Section, "href">[] = [
   {
     id: "support",
     number: "8.0",
-    title: "Support",
-    blurb: "We're here when you need a hand.",
+    title: "Help & Support",
+    blurb: "Tickets, refunds, and answers from our care team.",
     icon: LifeBuoy,
+    navHidden: true,
     features: [
       { id: "help", label: "Help center", description: "Step-by-step guides for every feature.", icon: HelpCircle },
       { id: "contact", label: "Contact us", description: "Reach our care team directly.", icon: Mail },

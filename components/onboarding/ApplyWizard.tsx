@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 import { BrandMark } from "@/components/shell/BrandMark";
 import {
@@ -47,8 +48,8 @@ type Props = {
 
 export function ApplyWizard({ kind, steps, intro, summarize }: Props) {
   const reduce = useReducedMotion();
-  const [hydrated, setHydrated] = useState(false);
-  const [resumeOffer, setResumeOffer] = useState(false);
+  const hydrated = useHydrated();
+  const [offerHandled, setOfferHandled] = useState(false);
   const [step, setStep] = useState(0);
   const [data, setData] = useState<FormData>({});
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -56,18 +57,14 @@ export function ApplyWizard({ kind, steps, intro, summarize }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<{ reference: string } | null>(null);
   const topRef = useRef<HTMLDivElement>(null);
-  const pending = useRef<ReturnType<typeof readDraft>>(null);
-
-  // Hydrate any saved draft.
-  useEffect(() => {
+  // Capture any saved draft once, as the client hydrates. It is kept in state (not
+  // re-read) because auto-save below starts overwriting storage straight away.
+  const [savedDraft, setSavedDraft] = useState<ReturnType<typeof readDraft> | undefined>(undefined);
+  if (hydrated && savedDraft === undefined) {
     const d = readDraft(kind);
-    if (d && (Object.keys(d.data).length > 0 || d.files.length > 0)) {
-      setResumeOffer(true);
-      // Stash for resume; do not auto-apply until user chooses.
-      pending.current = d;
-    }
-    setHydrated(true);
-  }, [kind]);
+    setSavedDraft(d && (Object.keys(d.data).length > 0 || d.files.length > 0) ? d : null);
+  }
+  const resumeOffer = !!savedDraft && !offerHandled;
 
   // Auto-save draft on change (after hydration, before submit).
   useEffect(() => {
@@ -84,17 +81,16 @@ export function ApplyWizard({ kind, steps, intro, summarize }: Props) {
   }, [kind, step, data, files, hydrated, done]);
 
   function resume() {
-    if (pending.current) {
-      setData(pending.current.data);
-      setFiles(pending.current.files);
-      setStep(Math.min(pending.current.step, steps.length - 1));
+    if (savedDraft) {
+      setData(savedDraft.data);
+      setFiles(savedDraft.files);
+      setStep(Math.min(savedDraft.step, steps.length - 1));
     }
-    setResumeOffer(false);
+    setOfferHandled(true);
   }
   function startFresh() {
     clearDraft(kind);
-    pending.current = null;
-    setResumeOffer(false);
+    setOfferHandled(true);
   }
 
   const current = steps[step];

@@ -3,19 +3,24 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
+  CalendarDays,
   Check,
   CheckCircle2,
   Crown,
   FileText,
   Plus,
   RefreshCw,
+  Receipt,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useBooking, type TierId } from "../booking/BookingContext";
 import { fetchProPlans } from "@/lib/plans/service";
+import { fetchOrders } from "@/lib/orders/service";
+import { ActivityBlock, SectionHead } from "@/components/dashboard/HubBlocks";
+import type { OrderRecord } from "@/lib/orders/types";
 import type { ProPlan } from "@/lib/plans/types";
 import { isRazorpayConfigured, openRazorpay } from "@/lib/payments/razorpay";
 
@@ -39,14 +44,44 @@ export function PlansHub({ onStartInsurance }: Props) {
   const [buyPlan, setBuyPlan] = useState<ProPlan | null>(null);
   const [paying, setPaying] = useState(false);
   const [paid, setPaid] = useState<{ plan: ProPlan; paymentId: string } | null>(null);
+  const [showPlans, setShowPlans] = useState(false);
+  const [orders, setOrders] = useState<OrderRecord[] | null>(null);
 
   useEffect(() => {
     let alive = true;
     fetchProPlans().then((p) => alive && setPlans(p));
+    fetchOrders().then((o) => alive && setOrders(o));
     return () => {
       alive = false;
     };
   }, []);
+
+  // Counts for the activity blocks, mirroring how Track groups them.
+  const activity = useMemo(() => {
+    if (!orders) return null;
+    const todayISO = new Date().toISOString().slice(0, 10);
+    type Sched = Extract<OrderRecord, { schedule: { date: string; slotLabel: string } }>;
+    const appts = (orders.filter(
+      (o) =>
+        (o.kind === "consult" && o.status === "upcoming" && o.schedule.date >= todayISO) ||
+        (o.kind === "test" && o.status !== "result_published" && o.schedule.date >= todayISO),
+    ) as Sched[]).sort((a, b) => a.schedule.date.localeCompare(b.schedule.date));
+    const next = appts[0];
+    const open = orders.filter(
+      (o) =>
+        (o.kind === "product" && o.status !== "delivered") ||
+        (o.kind === "test" && o.status !== "result_published"),
+    ).length;
+    return {
+      total: orders.length,
+      open,
+      appts: appts.length,
+      nextDate: next
+        ? new Date(next.schedule.date).toLocaleDateString(undefined, { day: "numeric", month: "short" })
+        : null,
+      nextSlot: next ? next.schedule.slotLabel : null,
+    };
+  }, [orders]);
 
   async function payNow(plan: ProPlan) {
     setPaying(true);
@@ -89,10 +124,16 @@ export function PlansHub({ onStartInsurance }: Props) {
     weekly: { label: "Weekly Pro", badge: "Pro · Weekly", line: "Renews every 7 days." },
   };
   const current = tierMeta[currentTier];
+  const currentPlan = plans ? plans.find((p) => p.id === currentTier) ?? null : null;
   const isFree = currentTier === "free";
+  // Only a cadence that costs less per day counts as an upgrade.
+  const upsell =
+    !isFree && plans
+      ? plans.find((p) => p.id !== currentTier && p.perDay < (plans.find((c) => c.id === currentTier)?.perDay ?? Infinity)) ?? null
+      : null;
 
   return (
-    <div className="relative px-10 pb-14 pt-2">
+    <div className="relative px-4 pb-12 pt-2 md:px-10 md:pb-14">
       {/* Soft top glow, no grid */}
       <div
         aria-hidden
@@ -103,12 +144,12 @@ export function PlansHub({ onStartInsurance }: Props) {
         }}
       />
 
-      {/* Current tier banner */}
+      {/* Membership: one card carrying status, what is included, and the upgrade path */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className={`relative flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-2xl p-5 ${
+        className={`relative overflow-hidden rounded-2xl ${
           isFree
             ? "bg-white shadow-[0_2px_4px_-2px_rgba(15,58,38,0.04),0_18px_36px_-22px_rgba(15,58,38,0.18)] ring-1 ring-[#006E42]/12"
             : "bg-gradient-to-br from-[#0a8551] to-[#006E42] text-white shadow-[0_18px_45px_-22px_rgba(0,110,66,0.5)] ring-1 ring-[#0f3a26]/10"
@@ -116,104 +157,96 @@ export function PlansHub({ onStartInsurance }: Props) {
       >
         {!isFree && (
           <>
-            {/* Soft diagonal sheen */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.14] via-white/0 to-transparent"
-            />
-            {/* Thin top highlight */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"
-            />
-            {/* Soft glow */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-white/15 blur-3xl"
-            />
-            {/* Faint counter-glow bottom-left */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute -bottom-24 -left-16 h-48 w-48 rounded-full bg-[#9af2c4]/15 blur-3xl"
-            />
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.14] via-white/0 to-transparent" />
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+            <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
           </>
         )}
-        <div className="flex items-center gap-4">
-          <span
-            className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
-              isFree
-                ? "bg-[#006E42]/10 text-[#006E42]"
-                : "bg-white/15 text-white ring-1 ring-white/20"
-            }`}
-          >
-            <Crown className="h-5 w-5" />
-          </span>
-          <div>
-            <p
-              className={`text-[11px] font-medium uppercase tracking-[0.14em] ${
-                isFree ? "text-[#006E42]/70" : "text-[#9af2c4]"
+
+        {/* identity + actions */}
+        <div className="relative flex flex-wrap items-center justify-between gap-4 p-5">
+          <div className="flex items-center gap-4">
+            <span
+              className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
+                isFree ? "bg-[#006E42]/10 text-[#006E42]" : "bg-white/15 text-white ring-1 ring-white/20"
               }`}
             >
-              Current plan · {current.badge}
-            </p>
-            <p
-              className={`mt-0.5 text-[16px] font-semibold ${
-                isFree ? "text-[#0f3a26]" : "text-white"
-              }`}
-            >
-              You&apos;re on the {current.label} plan
-            </p>
-            <p
-              className={`mt-0.5 text-[12.5px] ${
-                isFree ? "text-[#0f3a26]/55" : "text-white/70"
-              }`}
-            >
-              {current.line}
-            </p>
+              <Crown className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className={`text-[10.5px] font-semibold uppercase tracking-[0.16em] ${isFree ? "text-[#006E42]/70" : "text-[#9af2c4]"}`}>
+                Current plan
+              </p>
+              <p className={`mt-0.5 text-[19px] font-bold leading-tight tracking-tight ${isFree ? "text-[#0f3a26]" : "text-white"}`}>
+                {current.label}
+              </p>
+              <p className={`mt-0.5 text-[12.5px] ${isFree ? "text-[#0f3a26]/55" : "text-white/70"}`}>
+                {currentPlan ? `₹${currentPlan.price} ${currentPlan.period} · ${current.line}` : current.line}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            {isFree ? (
+              <a
+                href="#pro-plans"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#006E42] px-4 py-2.5 text-[12.5px] font-semibold text-white transition hover:bg-[#005634]"
+              >
+                See plans
+                <ArrowRight className="h-3.5 w-3.5" />
+              </a>
+            ) : (
+              <button
+                onClick={() => setShowPlans((v) => !v)}
+                className="rounded-xl bg-white/15 px-4 py-2.5 text-[12.5px] font-medium text-white ring-1 ring-inset ring-white/25 transition hover:bg-white/25"
+              >
+                {showPlans ? "Hide plans" : "Change plan"}
+              </button>
+            )}
           </div>
         </div>
-        {isFree && (
-          <div className="flex items-center gap-3">
-            <ul className="hidden text-[11.5px] text-[#0f3a26]/55 sm:block">
-              {FREE_FEATURES.map((f) => (
-                <li key={f}>· {f}</li>
-              ))}
-            </ul>
-            <a
-              href="#pro-plans"
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#006E42] px-4 py-2 text-[12.5px] font-medium text-white transition hover:bg-[#005634]"
+
+        {/* what the plan actually gives you, filling the row instead of dead space */}
+        <div className={`relative flex flex-wrap gap-x-5 gap-y-2 border-t px-5 py-3 ${isFree ? "border-[#0f3a26]/8" : "border-white/15"}`}>
+          {(isFree ? FREE_FEATURES : (currentPlan ? currentPlan.features.slice(0, 5) : [])).map((f) => (
+            <span
+              key={f}
+              className={`inline-flex items-center gap-1.5 text-[12px] ${isFree ? "text-[#0f3a26]/65" : "text-white/85"}`}
+            >
+              <Check className={`h-3.5 w-3.5 shrink-0 ${isFree ? "text-[#006E42]" : "text-[#9af2c4]"}`} strokeWidth={3} />
+              {f}
+            </span>
+          ))}
+        </div>
+
+        {/* the upgrade nudge lives here, not in a second bar */}
+        {upsell && (
+          <div className="relative flex flex-wrap items-center justify-between gap-3 border-t border-white/15 bg-white/[0.08] px-5 py-3">
+            <p className="text-[12.5px] text-white/85">
+              Switch to {upsell.label} and pay about ₹{upsell.perDay} a day.
+            </p>
+            <button
+              onClick={() => setBuyPlan(upsell)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[#006E42] transition hover:bg-white/90"
             >
               Upgrade
               <ArrowRight className="h-3.5 w-3.5" />
-            </a>
+            </button>
           </div>
-        )}
-        {!isFree && (
-          <a
-            href="#pro-plans"
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 text-[12.5px] font-medium text-white ring-1 ring-white/20 transition hover:bg-white/25"
-          >
-            Manage plan
-          </a>
         )}
       </motion.div>
 
-      {/* Pro section */}
-      <div id="pro-plans" className="mt-14 max-w-2xl">
-        <div className="inline-flex items-center gap-2 rounded-full bg-[#006E42]/8 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[#006E42]">
-          <Crown className="h-3 w-3" />
-          SuppAI Pro
+      {/* Pro pricing: the pitch while on Free, on demand once subscribed */}
+      {isFree && (
+        <div id="pro-plans" className="mt-9">
+          <SectionHead label="SuppAI Pro" title="Choose a cadence" />
+          <p className="text-[12.5px] leading-relaxed text-[#0f3a26]/55">
+            Cancel anytime. Pro powers AI report analysis, personalised plans, and priority care.
+          </p>
         </div>
-        <h2 className="mt-4 text-[34px] font-semibold leading-[1.1] tracking-tight text-[#0f3a26]">
-          The whole platform, unlocked.
-        </h2>
-        <p className="mt-2 text-[14px] leading-relaxed text-[#0f3a26]/60">
-          Pick a billing cadence. Cancel anytime. Pro powers AI report
-          analysis, personalised plans, and priority care.
-        </p>
-      </div>
+      )}
 
-      <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className={`grid grid-cols-1 gap-5 lg:grid-cols-2 ${isFree ? "mt-8" : showPlans ? "mt-6" : "hidden"}`}>
         {(plans ?? Array.from({ length: 2 }).map(() => null)).map((plan, i) =>
           plan ? (
             <PlanCard
@@ -236,22 +269,9 @@ export function PlansHub({ onStartInsurance }: Props) {
         )}
       </div>
 
-      {/* Insurance section */}
-      <div className="mt-14 max-w-2xl">
-        <div className="inline-flex items-center gap-2 rounded-full bg-[#006E42]/8 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[#006E42]">
-          <ShieldCheck className="h-3 w-3" />
-          Health insurance
-        </div>
-        <h2 className="mt-4 text-[28px] font-semibold leading-[1.1] tracking-tight text-[#0f3a26]">
-          {activeInsurance
-            ? "Your active policy"
-            : "Cover your family in a few minutes."}
-        </h2>
-        <p className="mt-2 text-[14px] leading-relaxed text-[#0f3a26]/60">
-          {activeInsurance
-            ? "Your policy is active. You can view it, file a claim, or add a new one."
-            : "A personalised policy from leading insurers, tailored to your medical history. Pay later, save in tax."}
-        </p>
+      {/* Insurance */}
+      <div className="mt-9">
+        <SectionHead label="Insurance" title={activeInsurance ? "Your active policy" : "Health cover"} />
       </div>
 
       {activeInsurance ? (
@@ -265,37 +285,62 @@ export function PlansHub({ onStartInsurance }: Props) {
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          whileHover={{ y: -2 }}
           onClick={onStartInsurance}
-          className="group relative mt-7 flex w-full items-center gap-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#006E42] via-[#007a4a] to-[#008a53] p-7 text-left text-white shadow-[0_2px_4px_-2px_rgba(0,110,66,0.4),0_28px_55px_-22px_rgba(0,110,66,0.45)] ring-1 ring-[#0f3a26]/10 transition-shadow duration-300 ease-out hover:shadow-[0_4px_8px_-3px_rgba(0,110,66,0.5),0_34px_60px_-22px_rgba(0,110,66,0.55)]"
+          className="group flex w-full flex-col items-start gap-4 rounded-2xl bg-white p-5 text-left shadow-[0_1px_2px_-1px_rgba(15,58,38,0.04),0_12px_28px_-20px_rgba(15,58,38,0.18)] ring-1 ring-[#006E42]/12 transition hover:ring-[#006E42]/30 sm:flex-row sm:items-center sm:gap-6 sm:p-6"
         >
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-white/12 blur-3xl"
-          />
-          <span className="relative grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/25">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#006E42]/10 text-[#006E42]">
             <ShieldCheck className="h-6 w-6" />
           </span>
-          <div className="relative flex-1">
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/65">
+
+          <div className="min-w-0 flex-1">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#006E42]/70">
               Get covered
             </p>
-            <h3 className="mt-1 text-[22px] font-semibold leading-tight tracking-tight">
+            <h3 className="mt-0.5 text-[16px] font-semibold tracking-tight text-[#0f3a26]">
               Personalised health insurance
             </h3>
-            <p className="mt-1 max-w-xl text-[13.5px] leading-relaxed text-white/75">
-              Add your family, share medical history, and we&apos;ll match you
-              with the right cover from leading insurers.
+            <p className="mt-1 text-[12.5px] leading-relaxed text-[#0f3a26]/60">
+              Add your family, share medical history, and we&apos;ll match you with the right cover from leading insurers.
             </p>
-            <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
               <Badge>Cover up to ₹25L</Badge>
               <Badge>Cashless network</Badge>
               <Badge>80D tax savings</Badge>
             </div>
           </div>
-          <ArrowRight className="relative h-5 w-5 shrink-0 text-white transition group-hover:translate-x-0.5" />
+
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#006E42] px-4 py-2.5 text-[12.5px] font-semibold text-white transition group-hover:bg-[#005634]">
+            Get covered
+            <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+          </span>
         </motion.button>
       )}
+
+      {/* Orders and appointments, folded in from Track & Manage */}
+      <div className="mt-9">
+        <SectionHead label="Your activity" title="Orders and appointments" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        <ActivityBlock
+          href="/dashboard/track#orders"
+          icon={Receipt}
+          label="Orders"
+          value={activity ? String(activity.total) : null}
+          unit={activity && activity.total === 1 ? "order" : "orders"}
+          detail={activity ? (activity.open > 0 ? activity.open + " still in progress" : "All caught up, nothing pending") : ""}
+          cta="Track orders"
+        />
+        <ActivityBlock
+          href="/dashboard/track#appointments"
+          icon={CalendarDays}
+          label="Appointments"
+          value={activity ? String(activity.appts) : null}
+          unit="upcoming"
+          detail={activity ? (activity.nextDate ? "Next on " + activity.nextDate + (activity.nextSlot ? ", " + activity.nextSlot : "") : "Nothing booked yet") : ""}
+          cta="View appointments"
+        />
+      </div>
 
       <ProPayModal plan={buyPlan} paying={paying} onClose={() => { if (!paying) setBuyPlan(null); }} onConfirm={payNow} />
       <ProPaidModal info={paid} onClose={() => setPaid(null)} />
@@ -378,7 +423,7 @@ function ProPaidModal({ info, onClose }: { info: { plan: ProPlan; paymentId: str
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 font-medium text-white/90 ring-1 ring-white/20">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#006E42]/8 px-2.5 py-1 text-[11px] font-medium text-[#006E42] ring-1 ring-inset ring-[#006E42]/12">
       <Sparkles className="h-3 w-3" />
       {children}
     </span>
@@ -399,7 +444,7 @@ function ActiveInsuranceCard({
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="mt-7 grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]"
+      className="grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]"
     >
       <div className="relative overflow-hidden rounded-3xl bg-white p-7 shadow-[0_2px_4px_-2px_rgba(15,58,38,0.05),0_18px_36px_-22px_rgba(15,58,38,0.18)] ring-1 ring-[#006E42]/15">
         <div

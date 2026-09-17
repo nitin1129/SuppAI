@@ -144,10 +144,16 @@ function ReviewDrawer({ product, onClose, onUpdate }: { product: VendorProduct |
   const [featured, setFeatured] = useState(false);
   const [hero, setHero] = useState(0);
 
-  useEffect(() => {
-    if (!product) return;
+  // Reset the review form for each product opened.
+  const [seenProduct, setSeenProduct] = useState<typeof product>(null);
+  if (product && product !== seenProduct) {
+    setSeenProduct(product);
     setMode(null); setNote(""); setSku(""); setBadge(""); setFeatured(false); setHero(0); setErr(null);
     setCategoryId(CATEGORY_GUESS[product.category] ?? "vitamins");
+  }
+
+  useEffect(() => {
+    if (!product) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

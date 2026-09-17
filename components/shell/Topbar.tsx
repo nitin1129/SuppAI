@@ -25,19 +25,19 @@ export function Topbar({
 
   return (
     <header className="sticky top-0 z-30 bg-[#f6faf7]/85 backdrop-blur-xl">
-      <div className="flex items-center justify-between px-10 py-5">
+      <div className="flex items-center justify-between gap-3 px-4 py-3.5 md:px-10 md:py-5">
         <div className="min-w-0">
-          <h1 className="truncate text-[22px] font-semibold tracking-tight text-[#0f3a26]">
+          <h1 className="truncate text-[17px] font-semibold tracking-tight text-[#0f3a26] md:text-[22px]">
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-0.5 truncate text-[12.5px] text-[#0f3a26]/55">
+            <p className="mt-0.5 hidden truncate text-[12.5px] text-[#0f3a26]/55 sm:block">
               {subtitle}
             </p>
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 md:gap-3">
           <div className="hidden items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-[13px] text-[#0f3a26]/55 ring-1 ring-[#006E42]/12 transition focus-within:ring-[#006E42]/40 md:flex md:w-64">
             <Search className="h-4 w-4 text-[#0f3a26]/40" />
             <input

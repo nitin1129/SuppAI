@@ -69,7 +69,7 @@ function Payment() {
 
   if (status === "paid") {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center px-10">
+      <div className="flex min-h-[70vh] items-center justify-center px-5 md:px-10">
         <motion.div
           initial={{ opacity: 0, scale: 0.94 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -79,7 +79,7 @@ function Payment() {
           <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#006E42]/10 text-[#006E42]">
             <CheckCircle2 className="h-8 w-8" />
           </span>
-          <h2 className="mt-6 text-[28px] font-semibold tracking-tight text-[#0f3a26]">
+          <h2 className="mt-6 text-[23px] font-semibold tracking-tight text-[#0f3a26] sm:text-[28px]">
             Booking confirmed
           </h2>
           <p className="mt-2 text-[14px] leading-relaxed text-[#0f3a26]/60">
@@ -98,7 +98,7 @@ function Payment() {
   }
 
   return (
-    <div className="flex h-full flex-col px-10 pb-6 pt-2">
+    <div className="flex h-full flex-col px-4 pb-6 pt-2 md:px-10">
       <div className="shrink-0">
         <button
           onClick={clearOrder}

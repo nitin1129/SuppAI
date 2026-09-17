@@ -7,6 +7,7 @@ import {
   BookingProvider,
   useBooking,
 } from "@/components/dashboard/booking/BookingContext";
+import { MobileNav } from "@/components/dashboard/MobileNav";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Footer } from "@/components/shell/Footer";
 import { Topbar } from "@/components/shell/Topbar";
@@ -63,11 +64,13 @@ function Shell({ children }: { children: React.ReactNode }) {
             active?.blurb ?? ""
           }
         />
-        <main className="no-scrollbar flex flex-1 flex-col overflow-y-auto">
+        <main className="no-scrollbar flex flex-1 flex-col overflow-y-auto pb-[86px] md:pb-0">
           <div className="flex-1">{children}</div>
           <Footer />
         </main>
       </div>
+
+      <MobileNav sections={sections} active={activeId} />
     </div>
   );
 }

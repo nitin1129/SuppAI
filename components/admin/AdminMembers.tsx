@@ -102,9 +102,15 @@ function MemberDrawer({ member, onClose, onUpdate }: { member: Member | null; on
   const [banning, setBanning] = useState(false);
   const [checks, setChecks] = useState({ history: false, permanent: false, irreversible: false });
 
+  // Clear the ban form whenever a different member (or updated record) is shown.
+  const [seenMember, setSeenMember] = useState<Member | null>(null);
+  if (member && member !== seenMember) {
+    setSeenMember(member);
+    setReason(""); setBanning(false); setChecks({ history: false, permanent: false, irreversible: false });
+  }
+
   useEffect(() => {
     if (!member) return;
-    setReason(""); setBanning(false); setChecks({ history: false, permanent: false, irreversible: false });
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

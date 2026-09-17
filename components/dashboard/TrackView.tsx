@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import {
+  ArrowLeft,
   Ban,
   Bell,
   Box,
@@ -112,7 +113,7 @@ export function TrackView() {
     return orders
       .filter(
         (o) =>
-          (o.kind === "consult" && o.status === "upcoming") ||
+          (o.kind === "consult" && o.status === "upcoming" && o.schedule.date >= todayISO) ||
           (o.kind === "test" &&
             o.status !== "result_published" &&
             o.schedule.date >= todayISO),
@@ -158,10 +159,18 @@ export function TrackView() {
   if (orders.length === 0) return <EmptyState />;
 
   return (
-    <div className="px-6 py-6 md:px-10">
+    <div className="px-4 py-5 md:px-10 md:py-6">
+      <Link
+        href="/dashboard/plans"
+        className="mb-4 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[#0f3a26]/55 transition hover:text-[#006E42]"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Plans &amp; Bookings
+      </Link>
+
       {/* Upcoming appointments */}
       {upcoming.length > 0 && (
-        <section className="mb-9">
+        <section id="appointments" className="mb-9 scroll-mt-24">
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-[15px] font-bold tracking-tight text-[#0f3a26]">
               Upcoming appointments
@@ -177,7 +186,7 @@ export function TrackView() {
       )}
 
       {/* Orders */}
-      <section>
+      <section id="orders" className="scroll-mt-24">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[15px] font-bold tracking-tight text-[#0f3a26]">Your orders</h2>
           <div className="flex flex-wrap items-center gap-1">

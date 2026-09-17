@@ -52,8 +52,12 @@ export function ConsultView({ onHome }: { onHome?: () => void }) {
   const [specialties, setSpecialties] = useState<Specialty[] | null>(null);
   const [specialty, setSpecialty] = useState<string>("");
   const [pincode, setPincode] = useState("");
-  const [doctors, setDoctors] = useState<Doctor[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Results are tagged with the query that produced them, so "loading" is simply
+  // "the latest results are for a different query".
+  const doctorQuery = `${specialty}|${pincode}`;
+  const [doctorResult, setDoctorResult] = useState<{ query: string; doctors: Doctor[] } | null>(null);
+  const doctors = doctorResult ? doctorResult.doctors : null;
+  const loading = doctorResult?.query !== doctorQuery;
   const [selected, setSelected] = useState<Doctor | null>(null);
 
   useEffect(() => {
@@ -69,11 +73,10 @@ export function ConsultView({ onHome }: { onHome?: () => void }) {
 
   useEffect(() => {
     let alive = true;
-    setLoading(true);
+    const query = `${specialty}|${pincode}`;
     fetchDoctors(specialty || "all", pincode).then((d) => {
       if (!alive) return;
-      setDoctors(d);
-      setLoading(false);
+      setDoctorResult({ query, doctors: d });
     });
     return () => {
       alive = false;
@@ -91,7 +94,7 @@ export function ConsultView({ onHome }: { onHome?: () => void }) {
   }
 
   return (
-    <div className="px-10 pb-14 pt-2">
+    <div className="px-4 pb-12 pt-2 md:px-10 md:pb-14">
       {onHome && (
         <button
           onClick={onHome}
@@ -107,7 +110,7 @@ export function ConsultView({ onHome }: { onHome?: () => void }) {
           <Stethoscope className="h-3 w-3" />
           Consult a doctor
         </div>
-        <h2 className="mt-4 text-[34px] font-semibold leading-[1.1] tracking-tight text-[#0f3a26]">
+        <h2 className="mt-4 text-[25px] font-semibold leading-[1.15] tracking-tight text-[#0f3a26] sm:text-[34px] sm:leading-[1.1]">
           Find the right specialist.
         </h2>
         <p className="mt-2 text-[14px] leading-relaxed text-[#0f3a26]/60">
@@ -317,7 +320,7 @@ function ConsultWizard({
   }
 
   return (
-    <div className="flex h-full flex-col px-10 pb-4 pt-2">
+    <div className="flex h-full flex-col px-4 pb-4 pt-2 md:px-10">
       <div className="shrink-0">
         <button
           onClick={onExit}
@@ -632,13 +635,15 @@ function StepSchedule({
   const [viewMonth, setViewMonth] = useState(
     new Date(tomorrow.getFullYear(), tomorrow.getMonth(), 1),
   );
-  const [slots, setSlots] = useState<TimeSlot[] | null>(null);
+  // Slots are tagged with their date; a different date means "still loading".
+  const [slotResult, setSlotResult] = useState<{ date: string; slots: TimeSlot[] } | null>(null);
+  const slots = slotResult && slotResult.date === schedule.date ? slotResult.slots : null;
 
   useEffect(() => {
     if (!schedule.date) return;
     let alive = true;
-    setSlots(null);
-    fetchSlots(schedule.date).then((s) => alive && setSlots(s));
+    const date = schedule.date;
+    fetchSlots(date).then((s) => alive && setSlotResult({ date, slots: s }));
     return () => {
       alive = false;
     };

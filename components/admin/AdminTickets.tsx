@@ -181,9 +181,15 @@ function TicketDrawer({ ticket, onClose, onUpdate }: { ticket: Ticket | null; on
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Start with an empty reply for each ticket shown.
+  const [seenTicket, setSeenTicket] = useState<Ticket | null>(null);
+  if (ticket && ticket !== seenTicket) {
+    setSeenTicket(ticket);
+    setReply("");
+  }
+
   useEffect(() => {
     if (!ticket) return;
-    setReply("");
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

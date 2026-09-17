@@ -26,7 +26,7 @@ export function Sidebar({ sections, active }: Props) {
       initial={false}
       animate={{ width: open ? EXPANDED : COLLAPSED }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="relative z-20 flex h-screen shrink-0 flex-col overflow-hidden border-r border-[#006E42]/8 bg-white"
+      className="relative z-20 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-[#006E42]/8 bg-white md:flex"
     >
       {/* Brand: full logo at both states, scales with sidebar width */}
       <div className="flex h-[88px] shrink-0 items-center justify-center px-3">
@@ -50,7 +50,7 @@ export function Sidebar({ sections, active }: Props) {
           Workspace
         </motion.p>
 
-        {sections.map((s) => (
+        {sections.filter((s) => !s.navHidden).map((s) => (
           <NavRow
             key={s.id}
             open={open}

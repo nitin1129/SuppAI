@@ -4,11 +4,12 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
+
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 import type { WishlistDraft, WishlistItem } from "./types";
 
@@ -52,16 +53,14 @@ function write(items: WishlistItem[]) {
 }
 
 export function WishlistProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<WishlistItem[]>([]);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    setItems(read());
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
+  // What storage held when the page loaded; local edits take over once made.
+  const stored = useMemo<WishlistItem[]>(() => (hydrated ? read() : []), [hydrated]);
+  const [edited, setEdited] = useState<WishlistItem[] | null>(null);
+  const items = edited ?? stored;
 
   const persist = useCallback((next: WishlistItem[]) => {
-    setItems(next);
+    setEdited(next);
     write(next);
   }, []);
 

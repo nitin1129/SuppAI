@@ -68,7 +68,7 @@ export type NewTicket = {
   related?: string;
 };
 
-const LS_TICKETS = "suppai.support.tickets.v1";
+const LS_TICKETS = "suppai.support.tickets.v2";
 
 function seedTickets(): Ticket[] {
   const now = Date.now();
@@ -105,6 +105,37 @@ function seedTickets(): Ticket[] {
       messages: [
         { id: "m1", from: "you", author: "You", body: "My monthly multivitamin shipment was 7 days late this cycle.", at: new Date(now - 8 * day).toISOString() },
         { id: "m2", from: "agent", author: "Rohit, Care team", body: "Apologies for the delay. We have credited ₹100 to your wallet and prioritised your next dispatch. It ships tomorrow.", at: new Date(now - 6 * day).toISOString() },
+      ],
+    },
+    {
+      id: "t-3",
+      ref: "SUP-4903",
+      requester: DEFAULT_REQUESTER,
+      category: "appointment",
+      subject: "Need to move my cardiology consult to the evening",
+      priority: "normal",
+      status: "in_progress",
+      related: "SA-DOC-2260",
+      createdAt: new Date(now - 1 * day).toISOString(),
+      updatedAt: new Date(now - 3 * hr).toISOString(),
+      messages: [
+        { id: "t3-m1", from: "you", author: "You", body: "My consult with Dr. Rohan Kapoor clashes with work. Is there an evening slot the same week?", at: new Date(now - 1 * day).toISOString() },
+        { id: "t3-m2", from: "agent", author: "Ananya, Care team", body: "Checking with the clinic now. Dr. Kapoor has 18:00 and 18:30 open on the same day, we will confirm one of them shortly.", at: new Date(now - 3 * hr).toISOString() },
+      ],
+    },
+    {
+      id: "t-4",
+      ref: "SUP-4910",
+      requester: DEFAULT_REQUESTER,
+      category: "payment",
+      subject: "Charged twice for my Ashwagandha order",
+      priority: "high",
+      status: "open",
+      related: "SA-ORD-4902",
+      createdAt: new Date(now - 2 * hr).toISOString(),
+      updatedAt: new Date(now - 2 * hr).toISOString(),
+      messages: [
+        { id: "t4-m1", from: "you", author: "You", body: "My UPI app shows two debits of ₹1,348 for the same order. Please refund the duplicate.", at: new Date(now - 2 * hr).toISOString() },
       ],
     },
   ];

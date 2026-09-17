@@ -18,14 +18,14 @@ export function SectionView({ section }: Props) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="px-10 pb-14 pt-2"
+      className="px-4 pb-12 pt-2 md:px-10 md:pb-14"
     >
       <div className="max-w-3xl">
         <div className="inline-flex items-center gap-2 rounded-full bg-[#006E42]/8 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[#006E42]">
           <section.icon className="h-3 w-3" />
           {section.title}
         </div>
-        <h2 className="mt-4 text-[34px] font-semibold leading-[1.1] tracking-tight text-[#0f3a26]">
+        <h2 className="mt-4 text-[25px] font-semibold leading-[1.15] tracking-tight text-[#0f3a26] sm:text-[34px] sm:leading-[1.1]">
           {section.blurb}
         </h2>
       </div>

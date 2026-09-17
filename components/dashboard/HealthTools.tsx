@@ -1,20 +1,21 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Activity, ArrowRight, Flame, Plus, Trash2, Utensils, X } from "lucide-react";
+import { Activity, ArrowRight, Flame, Loader2, Search, Utensils, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { FOODS, findFood } from "@/lib/gethealthy/foods";
+import { calculateBmi, calculateBmr, getFoodCalories, type BmiResult, type BmrResult, type FoodResult, type Gender } from "@/lib/api/health";
+import { FOODS } from "@/lib/gethealthy/foods";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const CARD = "rounded-3xl bg-white shadow-[0_2px_4px_-2px_rgba(15,58,38,0.08),0_16px_36px_-20px_rgba(15,58,38,0.30)] ring-1 ring-[#0f3a26]/10";
 
 type Tool = "bmi" | "bmr" | "food";
 
-const TOOLS: { key: Tool; title: string; body: string; icon: React.ComponentType<{ className?: string }>; tint: string }[] = [
-  { key: "bmi", title: "BMI calculator", body: "Check your body mass index and category.", icon: Activity, tint: "bg-[#006E42]/10 text-[#006E42]" },
-  { key: "bmr", title: "BMR & calories", body: "Daily calories your body burns to maintain.", icon: Flame, tint: "bg-[#c79a3d]/16 text-[#9c7426]" },
-  { key: "food", title: "Food calories", body: "Add foods by weight and total the calories.", icon: Utensils, tint: "bg-[#7c6bd6]/14 text-[#5f52ad]" },
+const TOOLS: { key: Tool; title: string; short: string; body: string; icon: React.ComponentType<{ className?: string }>; tint: string }[] = [
+  { key: "bmi", title: "BMI calculator", short: "BMI", body: "Check your body mass index and category.", icon: Activity, tint: "bg-[#006E42]/10 text-[#006E42]" },
+  { key: "bmr", title: "BMR & calories", short: "BMR", body: "Daily calories your body burns to maintain.", icon: Flame, tint: "bg-[#c79a3d]/16 text-[#9c7426]" },
+  { key: "food", title: "Food calories", short: "Food", body: "Search any food to see its calories and macros.", icon: Utensils, tint: "bg-[#7c6bd6]/14 text-[#5f52ad]" },
 ];
 
 export function HealthTools() {
@@ -28,13 +29,16 @@ export function HealthTools() {
         <h2 className="text-[15px] font-bold tracking-tight text-[#0f3a26]">Health tools</h2>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {TOOLS.map((t) => (
-          <button key={t.key} onClick={() => setOpen(t.key)} className={`group ${CARD} flex flex-col items-start p-5 text-left transition hover:ring-[#006E42]/30`}>
-            <span className={`grid h-11 w-11 place-items-center rounded-xl ${t.tint}`}><t.icon className="h-5 w-5" /></span>
-            <p className="mt-3.5 text-[14.5px] font-bold text-[#0f3a26]">{t.title}</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-[#0f3a26]/60">{t.body}</p>
-            <span className="mt-3 inline-flex items-center gap-1 text-[12.5px] font-semibold text-[#006E42]">Open<ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span>
+          <button key={t.key} onClick={() => setOpen(t.key)} className={`group ${CARD} flex flex-col items-center gap-2 p-3 text-center transition hover:ring-[#006E42]/30 sm:items-start sm:gap-0 sm:p-5 sm:text-left`}>
+            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl sm:h-11 sm:w-11 ${t.tint}`}><t.icon className="h-5 w-5" /></span>
+            <p className="text-[12px] font-bold leading-tight text-[#0f3a26] sm:mt-3.5 sm:text-[14.5px]">
+              <span className="sm:hidden">{t.short}</span>
+              <span className="hidden sm:inline">{t.title}</span>
+            </p>
+            <p className="mt-1 hidden text-[12px] leading-relaxed text-[#0f3a26]/60 sm:block">{t.body}</p>
+            <span className="mt-3 hidden items-center gap-1 text-[12.5px] font-semibold text-[#006E42] sm:inline-flex">Open<ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span>
           </button>
         ))}
       </div>
@@ -98,38 +102,131 @@ function Num({ label, value, onChange, suffix, placeholder }: { label: string; v
   );
 }
 
-function Result({ value, label, note, tone = "ok" }: { value: string; label: string; note?: string; tone?: "ok" | "warn" | "bad" }) {
-  const cls = tone === "warn" ? "bg-[#c79a3d]/[0.10] text-[#9c7426] ring-[#c79a3d]/20" : tone === "bad" ? "bg-[#c14040]/[0.08] text-[#c14040] ring-[#c14040]/20" : "bg-[#006E42]/[0.07] text-[#006E42] ring-[#006E42]/15";
+function CalcButton({ onClick, disabled, loading, label }: { onClick: () => void; disabled: boolean; loading: boolean; label: string }) {
   return (
-    <div className={`mt-5 rounded-2xl px-4 py-4 text-center ring-1 ring-inset ${cls}`}>
-      <p className="text-[30px] font-bold leading-none tabular-nums">{value}</p>
-      <p className="mt-1.5 text-[12px] font-semibold">{label}</p>
-      {note && <p className="mt-0.5 text-[11px] opacity-80">{note}</p>}
-    </div>
+    <button onClick={onClick} disabled={disabled} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006E42] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#005634] disabled:opacity-45">
+      {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Calculating</> : label}
+    </button>
   );
 }
 
+function ErrorNote({ msg }: { msg: string }) {
+  return <p className="mt-3 rounded-xl bg-[#c14040]/8 px-3.5 py-2.5 text-[12px] font-medium text-[#c14040] ring-1 ring-inset ring-[#c14040]/15">{msg}</p>;
+}
+
+function Hint({ children }: { children: React.ReactNode }) {
+  return <p className="mt-5 rounded-2xl bg-[#f1f7f3] px-4 py-4 text-center text-[12.5px] text-[#0f3a26]/55 ring-1 ring-inset ring-[#0f3a26]/[0.08]">{children}</p>;
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return <span className="inline-flex items-center gap-1"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />{label}</span>;
+}
+
+const Reveal = ({ children }: { children: React.ReactNode }) => {
+  const reduce = useReducedMotion();
+  return <motion.div initial={reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}>{children}</motion.div>;
+};
+
 /* ------------------------------ BMI ------------------------------ */
+
+const BMI_MIN = 14, BMI_MAX = 35, BMI_SPAN = BMI_MAX - BMI_MIN;
+// Muted, theme-matched shades: soft gold, brand green, soft clay, muted brick.
+const BMI_ZONES = [
+  { label: "Underweight", short: "Under", max: 18.5, bar: "#d6b465", text: "#9c7426", pill: "bg-[#c79a3d]/14 text-[#9c7426]" },
+  { label: "Normal weight", short: "Normal", max: 25, bar: "#3f9a6e", text: "#006E42", pill: "bg-[#006E42]/10 text-[#006E42]" },
+  { label: "Overweight", short: "Over", max: 30, bar: "#d18d72", text: "#b06a4e", pill: "bg-[#c98a6a]/16 text-[#a86141]" },
+  { label: "Obese", short: "Obese", max: Infinity, bar: "#c07a72", text: "#a4544a", pill: "bg-[#c07a72]/16 text-[#a4544a]" },
+];
+const bmiZone = (bmi: number) => BMI_ZONES.find((z) => bmi < z.max) ?? BMI_ZONES[BMI_ZONES.length - 1];
+const bmiPct = (bmi: number) => Math.max(0, Math.min(1, (bmi - BMI_MIN) / BMI_SPAN)) * 100;
 
 function BmiCalc() {
   const [h, setH] = useState("");
   const [w, setW] = useState("");
+  const [res, setRes] = useState<BmiResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
   const hn = Number(h), wn = Number(w);
-  const bmi = hn > 0 && wn > 0 ? wn / Math.pow(hn / 100, 2) : 0;
-  const cat = bmi === 0 ? null : bmi < 18.5 ? { label: "Underweight", tone: "warn" as const } : bmi < 25 ? { label: "Healthy weight", tone: "ok" as const } : bmi < 30 ? { label: "Overweight", tone: "warn" as const } : { label: "Obese", tone: "bad" as const };
+  const ready = hn > 0 && wn > 0;
+  const reset = () => { setRes(null); setErr(null); };
+
+  async function run() {
+    if (!ready) return;
+    setLoading(true); setErr(null);
+    try { setRes(await calculateBmi(wn, hn)); }
+    catch (e) { setErr(e instanceof Error ? e.message : "Something went wrong."); setRes(null); }
+    finally { setLoading(false); }
+  }
 
   return (
     <div>
       <div className="grid grid-cols-2 gap-3">
-        <Num label="Height" value={h} onChange={setH} suffix="cm" placeholder="170" />
-        <Num label="Weight" value={w} onChange={setW} suffix="kg" placeholder="65" />
+        <Num label="Height" value={h} onChange={(v) => { setH(v); reset(); }} suffix="cm" placeholder="170" />
+        <Num label="Weight" value={w} onChange={(v) => { setW(v); reset(); }} suffix="kg" placeholder="65" />
       </div>
-      {cat ? (
-        <Result value={bmi.toFixed(1)} label={cat.label} note="BMI = weight ÷ height²" tone={cat.tone} />
-      ) : (
-        <p className="mt-5 rounded-2xl bg-[#f1f7f3] px-4 py-4 text-center text-[12.5px] text-[#0f3a26]/55 ring-1 ring-inset ring-[#0f3a26]/[0.08]">Enter your height and weight.</p>
-      )}
+      <CalcButton onClick={run} disabled={!ready || loading} loading={loading} label="Calculate BMI" />
+      {err && <ErrorNote msg={err} />}
+      {res ? <BmiScale bmi={res.bmi} category={res.category} heightCm={hn} /> : !err && <Hint>Enter your height and weight, then calculate.</Hint>}
     </div>
+  );
+}
+
+function BmiScale({ bmi, category, heightCm }: { bmi: number; category: string; heightCm: number }) {
+  const zone = bmiZone(bmi);
+  const marker = Math.max(3, Math.min(97, bmiPct(bmi)));
+  const m = heightCm / 100;
+  const healthyLo = Math.round(18.5 * m * m);
+  const healthyHi = Math.round(24.9 * m * m);
+  const note = zone.label === "Normal weight"
+    ? "You are in the healthy range. Keep it steady."
+    : bmi < 18.5
+      ? "You are below the healthy range. Steady, nutritious gains help."
+      : "You are above the healthy range. Small, steady changes add up.";
+
+  return (
+    <Reveal>
+      <div className="mt-6">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#0f3a26]/40">Your BMI</p>
+            <p className="mt-1 text-[36px] font-bold leading-none tabular-nums" style={{ color: zone.text }}>{bmi.toFixed(1)}</p>
+          </div>
+          <span className={`rounded-full px-3 py-1.5 text-[12px] font-semibold ${zone.pill}`}>{category || zone.label}</span>
+        </div>
+
+        {/* scale */}
+        <div className="relative mt-9">
+          <div className="absolute -top-[7px] -translate-x-1/2" style={{ left: `${marker}%` }} aria-hidden>
+            <div className="h-0 w-0 border-l-[5px] border-r-[5px] border-t-[7px] border-l-transparent border-r-transparent" style={{ borderTopColor: zone.bar }} />
+          </div>
+          <div className="flex h-2.5 overflow-hidden rounded-full">
+            {BMI_ZONES.map((z, i) => {
+              const lo = i === 0 ? BMI_MIN : BMI_ZONES[i - 1].max;
+              const hi = z.max === Infinity ? BMI_MAX : z.max;
+              return <div key={z.label} style={{ width: `${((hi - lo) / BMI_SPAN) * 100}%`, backgroundColor: z.bar }} />;
+            })}
+          </div>
+          <div className="relative mt-1.5 h-3">
+            {[18.5, 25, 30].map((v) => (
+              <span key={v} className="absolute -translate-x-1/2 text-[9.5px] font-medium tabular-nums text-[#0f3a26]/40" style={{ left: `${((v - BMI_MIN) / BMI_SPAN) * 100}%` }}>{v}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-medium text-[#0f3a26]/50">
+          {BMI_ZONES.map((z) => <Legend key={z.label} color={z.bar} label={z.short} />)}
+        </div>
+
+        <div className="mt-4 rounded-xl bg-[#f1f7f3] px-3.5 py-3 ring-1 ring-inset ring-[#0f3a26]/[0.06]">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11.5px] text-[#0f3a26]/60">Healthy weight for your height</span>
+            <span className="text-[13px] font-bold tabular-nums text-[#0f3a26]">{healthyLo} to {healthyHi} kg</span>
+          </div>
+          <p className="mt-2 border-t border-[#0f3a26]/[0.06] pt-2 text-[11.5px] leading-relaxed text-[#0f3a26]/60">{note}</p>
+        </div>
+      </div>
+    </Reveal>
   );
 }
 
@@ -143,31 +240,41 @@ const ACTIVITY = [
 ];
 
 function BmrCalc() {
-  const [gender, setGender] = useState<"male" | "female">("male");
+  const [gender, setGender] = useState<Gender>("Male");
   const [age, setAge] = useState("");
   const [h, setH] = useState("");
   const [w, setW] = useState("");
   const [act, setAct] = useState(1.375);
+  const [res, setRes] = useState<BmrResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const an = Number(age), hn = Number(h), wn = Number(w);
   const ready = an > 0 && hn > 0 && wn > 0;
-  const bmr = ready ? Math.round(10 * wn + 6.25 * hn - 5 * an + (gender === "male" ? 5 : -161)) : 0;
-  const tdee = Math.round(bmr * act);
+  const reset = () => { setRes(null); setErr(null); };
+
+  async function run() {
+    if (!ready) return;
+    setLoading(true); setErr(null);
+    try { setRes(await calculateBmr(wn, hn, an, gender)); }
+    catch (e) { setErr(e instanceof Error ? e.message : "Something went wrong."); setRes(null); }
+    finally { setLoading(false); }
+  }
 
   return (
     <div>
       <div className="mb-3">
         <span className="mb-1.5 block text-[11px] font-semibold text-[#0f3a26]/60">Gender</span>
         <div className="inline-flex rounded-xl bg-[#f1f7f3] p-1 ring-1 ring-inset ring-[#0f3a26]/[0.08]">
-          {(["male", "female"] as const).map((g) => (
-            <button key={g} onClick={() => setGender(g)} className={`rounded-lg px-4 py-1.5 text-[12.5px] font-semibold capitalize transition ${gender === g ? "bg-white text-[#0f3a26] shadow-sm ring-1 ring-[#0f3a26]/8" : "text-[#0f3a26]/55"}`}>{g}</button>
+          {(["Male", "Female", "Other"] as const).map((g) => (
+            <button key={g} onClick={() => { setGender(g); reset(); }} className={`rounded-lg px-3.5 py-1.5 text-[12.5px] font-semibold transition ${gender === g ? "bg-white text-[#0f3a26] shadow-sm ring-1 ring-[#0f3a26]/8" : "text-[#0f3a26]/55"}`}>{g}</button>
           ))}
         </div>
       </div>
       <div className="grid grid-cols-3 gap-3">
-        <Num label="Age" value={age} onChange={setAge} suffix="yr" placeholder="28" />
-        <Num label="Height" value={h} onChange={setH} suffix="cm" placeholder="170" />
-        <Num label="Weight" value={w} onChange={setW} suffix="kg" placeholder="65" />
+        <Num label="Age" value={age} onChange={(v) => { setAge(v); reset(); }} suffix="yr" placeholder="28" />
+        <Num label="Height" value={h} onChange={(v) => { setH(v); reset(); }} suffix="cm" placeholder="170" />
+        <Num label="Weight" value={w} onChange={(v) => { setW(v); reset(); }} suffix="kg" placeholder="65" />
       </div>
       <div className="mt-3">
         <span className="mb-1.5 block text-[11px] font-semibold text-[#0f3a26]/60">Activity level</span>
@@ -179,86 +286,195 @@ function BmrCalc() {
           ))}
         </div>
       </div>
-      {ready ? (
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-[#f1f7f3] px-4 py-4 text-center ring-1 ring-inset ring-[#0f3a26]/[0.08]">
-            <p className="text-[24px] font-bold tabular-nums text-[#0f3a26]">{bmr.toLocaleString()}</p>
-            <p className="mt-1 text-[11px] text-[#0f3a26]/55">BMR (kcal/day)</p>
-          </div>
-          <div className="rounded-2xl bg-[#006E42]/[0.07] px-4 py-4 text-center ring-1 ring-inset ring-[#006E42]/15">
-            <p className="text-[24px] font-bold tabular-nums text-[#006E42]">{tdee.toLocaleString()}</p>
-            <p className="mt-1 text-[11px] font-semibold text-[#006E42]">Maintenance kcal</p>
-          </div>
+      <CalcButton onClick={run} disabled={!ready || loading} loading={loading} label="Calculate calories" />
+      {err && <ErrorNote msg={err} />}
+      {res ? <BmrScale bmr={res.bmr} act={act} /> : !err && <Hint>Fill in your details, then calculate.</Hint>}
+    </div>
+  );
+}
+
+function BmrScale({ bmr, act }: { bmr: number; act: number }) {
+  const base = Math.round(bmr);
+  const maintenance = Math.round(bmr * act);
+  const activityKcal = maintenance - base;
+  const basePct = Math.max(0, Math.min(100, (base / maintenance) * 100));
+
+  return (
+    <Reveal>
+      <div className="mt-5 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#006E42]/60">Maintenance calories</p>
+          <p className="text-[34px] font-bold leading-none tabular-nums text-[#006E42]">{maintenance.toLocaleString()}</p>
+          <p className="mt-1 text-[11px] text-[#0f3a26]/45">kcal per day to stay the same</p>
         </div>
-      ) : (
-        <p className="mt-5 rounded-2xl bg-[#f1f7f3] px-4 py-4 text-center text-[12.5px] text-[#0f3a26]/55 ring-1 ring-inset ring-[#0f3a26]/[0.08]">Fill in age, height and weight.</p>
-      )}
-      {ready && <p className="mt-2 text-center text-[10.5px] text-[#0f3a26]/40">Eat below maintenance to lose weight, above to gain.</p>}
+        <div className="text-right">
+          <p className="text-[20px] font-bold tabular-nums text-[#0f3a26]">{base.toLocaleString()}</p>
+          <p className="text-[10.5px] text-[#0f3a26]/50">BMR, at rest</p>
+        </div>
+      </div>
+
+      {/* base + activity breakdown */}
+      <div className="mt-4">
+        <div className="flex h-3 overflow-hidden rounded-full">
+          <div style={{ width: `${basePct}%`, backgroundColor: "#3f9a6e" }} />
+          <div style={{ width: `${100 - basePct}%`, backgroundColor: "#d6b465" }} />
+        </div>
+        <div className="mt-2 flex items-center justify-between text-[10.5px] text-[#0f3a26]/60">
+          <Legend color="#3f9a6e" label={`Base burn ${base.toLocaleString()}`} />
+          <Legend color="#d6b465" label={`Activity +${activityKcal.toLocaleString()}`} />
+        </div>
+      </div>
+
+      {/* goals */}
+      <div className="mt-5 grid grid-cols-3 gap-2">
+        <Goal label="Lose" sub="~0.5 kg/wk" value={maintenance - 500} />
+        <Goal label="Maintain" value={maintenance} highlight />
+        <Goal label="Gain" sub="~0.5 kg/wk" value={maintenance + 500} />
+      </div>
+
+      <p className="mt-3 rounded-xl bg-[#f1f7f3] px-3.5 py-2.5 text-[11.5px] leading-relaxed text-[#0f3a26]/65 ring-1 ring-inset ring-[#0f3a26]/[0.06]">Eat below maintenance to lose weight, above to gain. About 500 kcal a day shifts roughly 0.5 kg a week.</p>
+    </Reveal>
+  );
+}
+
+function Goal({ label, sub, value, highlight }: { label: string; sub?: string; value: number; highlight?: boolean }) {
+  return (
+    <div className={`rounded-xl px-2 py-2.5 text-center ring-1 ring-inset ${highlight ? "bg-[#006E42]/8 ring-[#006E42]/20" : "bg-[#f1f7f3] ring-[#0f3a26]/[0.06]"}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-[#0f3a26]/50">{label}</p>
+      <p className={`mt-0.5 text-[15px] font-bold tabular-nums ${highlight ? "text-[#006E42]" : "text-[#0f3a26]"}`}>{value.toLocaleString()}</p>
+      {sub && <p className="text-[9px] text-[#0f3a26]/40">{sub}</p>}
     </div>
   );
 }
 
 /* ------------------------------ Food calories ------------------------------ */
 
-type FoodRow = { id: number; name: string; grams: number; kcal: number };
+// Macro colors: soft green, gold, muted violet (matches the food tool accent).
+const MACRO = { protein: "#3f9a6e", carbs: "#d6b465", fat: "#8b7fd0" };
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
 function FoodCalc() {
   const [name, setName] = useState("");
   const [grams, setGrams] = useState("");
-  const [rows, setRows] = useState<FoodRow[]>([]);
-  const [nextId, setNextId] = useState(1);
+  const [open, setOpen] = useState(false);
+  const [res, setRes] = useState<{ r: FoodResult; grams: number; typed: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  const matched = findFood(name);
   const g = Number(grams);
-  const preview = matched && g > 0 ? Math.round((matched.kcal * g) / 100) : 0;
-  const canAdd = !!matched && g > 0;
-  const total = rows.reduce((s, r) => s + r.kcal, 0);
+  const canSearch = name.trim().length > 0 && g > 0 && !loading;
+  const q = name.trim().toLowerCase();
+  const suggestions = q ? FOODS.filter((f) => f.name.toLowerCase().includes(q)).slice(0, 6) : [];
+  const clear = () => { setRes(null); setErr(null); };
 
-  function add() {
-    if (!canAdd || !matched) return;
-    setRows((r) => [...r, { id: nextId, name: matched.name, grams: g, kcal: preview }]);
-    setNextId((n) => n + 1);
-    setName("");
-    setGrams("");
+  async function search() {
+    if (!name.trim() || !(g > 0)) return;
+    setLoading(true); setErr(null); setOpen(false);
+    try {
+      const r = await getFoodCalories(name.trim(), g);
+      if (!r.found || r.calories == null) { setErr(`We could not find "${name.trim()}". Try a simpler or more common name.`); setRes(null); }
+      else setRes({ r, grams: g, typed: name.trim() });
+    }
+    catch (e) { setErr(e instanceof Error ? e.message : "Could not look that up."); setRes(null); }
+    finally { setLoading(false); }
   }
 
   return (
     <div>
-      <div className="grid grid-cols-[1fr_92px_auto] items-end gap-2">
-        <label className="block">
+      <div className="grid grid-cols-[1fr_92px] gap-2">
+        <div className="relative">
           <span className="mb-1.5 block text-[11px] font-semibold text-[#0f3a26]/60">Food</span>
-          <input list="food-list" value={name} onChange={(e) => setName(e.target.value)} placeholder="Start typing…" className="w-full rounded-xl border border-[#0f3a26]/12 bg-[#f6faf7] px-3.5 py-2.5 text-[14px] text-[#0f3a26] placeholder:text-[#0f3a26]/30 focus:border-[#006E42]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#006E42]/15" />
-          <datalist id="food-list">{FOODS.map((f) => <option key={f.name} value={f.name} />)}</datalist>
-        </label>
-        <label className="block">
+          <input
+            value={name}
+            onChange={(e) => { setName(e.target.value); setOpen(true); clear(); }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 120)}
+            onKeyDown={(e) => { if (e.key === "Enter" && canSearch) search(); if (e.key === "Escape") setOpen(false); }}
+            placeholder="e.g. rice, egg, banana"
+            autoComplete="off"
+            className="w-full rounded-xl border border-[#0f3a26]/12 bg-[#f6faf7] px-3.5 py-2.5 text-[14px] text-[#0f3a26] placeholder:text-[#0f3a26]/30 focus:border-[#006E42]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#006E42]/15"
+          />
+          {open && suggestions.length > 0 && (
+            <ul className="scrollbar-thin absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-xl border border-[#0f3a26]/10 bg-white py-1 shadow-[0_16px_36px_-18px_rgba(15,58,38,0.4)]">
+              {suggestions.map((f) => (
+                <li key={f.name}>
+                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setName(f.name); setOpen(false); clear(); }} className="flex w-full items-center justify-between gap-2 px-3.5 py-2 text-left text-[13px] text-[#0f3a26] transition hover:bg-[#f1f7f3]">
+                    <span className="truncate capitalize">{f.name}</span>
+                    <span className="shrink-0 text-[10.5px] text-[#0f3a26]/40">{f.kcal} kcal/100g</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
           <span className="mb-1.5 block text-[11px] font-semibold text-[#0f3a26]/60">Grams</span>
-          <input value={grams} onChange={(e) => setGrams(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="100" className="w-full rounded-xl border border-[#0f3a26]/12 bg-[#f6faf7] px-3 py-2.5 text-[14px] text-[#0f3a26] placeholder:text-[#0f3a26]/30 focus:border-[#006E42]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#006E42]/15" />
-        </label>
-        <button onClick={add} disabled={!canAdd} className="grid h-[42px] w-[42px] place-items-center rounded-xl bg-[#006E42] text-white transition hover:bg-[#005634] disabled:opacity-40" aria-label="Add food"><Plus className="h-4 w-4" /></button>
+          <input value={grams} onChange={(e) => { setGrams(e.target.value.replace(/[^0-9]/g, "")); clear(); }} onKeyDown={(e) => { if (e.key === "Enter" && canSearch) search(); }} inputMode="numeric" placeholder="100" className="w-full rounded-xl border border-[#0f3a26]/12 bg-[#f6faf7] px-3 py-2.5 text-[14px] text-[#0f3a26] placeholder:text-[#0f3a26]/30 focus:border-[#006E42]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#006E42]/15" />
+        </div>
       </div>
-      <p className="mt-1.5 text-[11px] text-[#0f3a26]/45">
-        {name && !matched ? "Pick a food from the list." : preview > 0 ? `${matched?.name}: ~${preview} kcal for ${g} g` : "Choose a food and enter grams."}
-      </p>
 
-      {rows.length > 0 && (
-        <ul className="mt-4 space-y-2">
-          {rows.map((r) => (
-            <li key={r.id} className="flex items-center gap-3 rounded-xl bg-[#f1f7f3] px-3.5 py-2.5 ring-1 ring-inset ring-[#0f3a26]/[0.08]">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[12.5px] font-semibold text-[#0f3a26]">{r.name}</p>
-                <p className="text-[10.5px] text-[#0f3a26]/50">{r.grams} g</p>
-              </div>
-              <span className="text-[13px] font-bold tabular-nums text-[#0f3a26]">{r.kcal} kcal</span>
-              <button onClick={() => setRows((x) => x.filter((y) => y.id !== r.id))} aria-label="Remove" className="grid h-7 w-7 place-items-center rounded-lg text-[#0f3a26]/35 transition hover:bg-[#c14040]/8 hover:text-[#c14040]"><Trash2 className="h-3.5 w-3.5" /></button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <button onClick={search} disabled={!canSearch} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#006E42] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#005634] disabled:opacity-45">
+        {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Searching</> : <><Search className="h-4 w-4" />Search food</>}
+      </button>
+      {err && <ErrorNote msg={err} />}
+      {res ? <FoodResultView r={res.r} grams={res.grams} typed={res.typed} /> : !err && <Hint>Search a food to see its calories and macros for the amount you enter.</Hint>}
+    </div>
+  );
+}
 
-      <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#006E42]/[0.07] px-4 py-3 ring-1 ring-inset ring-[#006E42]/15">
-        <span className="text-[12.5px] font-semibold text-[#0f3a26]">Total</span>
-        <span className="text-[18px] font-bold tabular-nums text-[#006E42]">{total.toLocaleString()} kcal</span>
+function FoodResultView({ r, grams, typed }: { r: FoodResult; grams: number; typed: string }) {
+  const q = r.quantity || grams;
+  const s = q / 100; // macros come back per 100g
+  const p = round1(r.protein * s), c = round1(r.carbs * s), f = round1(r.fat * s);
+  const pCal = p * 4, cCal = c * 4, fCal = f * 9, mTot = pCal + cCal + fCal || 1;
+
+  return (
+    <Reveal>
+      <div className="mt-5 overflow-hidden rounded-2xl bg-white ring-1 ring-inset ring-[#006E42]/15">
+        {/* calories headline */}
+        <div className="flex items-center justify-between gap-3 bg-[#006E42]/[0.06] px-4 py-3.5">
+          <div className="min-w-0">
+            <p className="truncate text-[15px] font-bold capitalize text-[#0f3a26]">{r.food_name || typed}</p>
+            <p className="mt-0.5 text-[11.5px] font-medium text-[#0f3a26]/55">{q} g serving · {Math.round(r.calories_per_100g)} kcal per 100 g</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-[34px] font-bold leading-none tabular-nums text-[#006E42]">{Math.round(r.calories).toLocaleString()}</p>
+            <p className="mt-1 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[#006E42]/60">kcal</p>
+          </div>
+        </div>
+
+        <div className="p-4">
+          {/* macro split bar */}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0f3a26]/45">Macros</span>
+            <span className="text-[10.5px] text-[#0f3a26]/45">per {q} g</span>
+          </div>
+          <div className="mt-2 flex h-3 overflow-hidden rounded-full bg-[#eef4f0]">
+            <div style={{ width: `${(pCal / mTot) * 100}%`, backgroundColor: MACRO.protein }} />
+            <div style={{ width: `${(cCal / mTot) * 100}%`, backgroundColor: MACRO.carbs }} />
+            <div style={{ width: `${(fCal / mTot) * 100}%`, backgroundColor: MACRO.fat }} />
+          </div>
+
+          {/* macro stat tiles */}
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <MacroTile color={MACRO.protein} label="Protein" grams={p} />
+            <MacroTile color={MACRO.carbs} label="Carbs" grams={c} />
+            <MacroTile color={MACRO.fat} label="Fat" grams={f} />
+          </div>
+        </div>
       </div>
+    </Reveal>
+  );
+}
+
+function MacroTile({ color, label, grams }: { color: string; label: string; grams: number }) {
+  return (
+    <div className="rounded-xl bg-[#f6faf7] px-2.5 py-2.5 text-center ring-1 ring-inset ring-[#0f3a26]/[0.06]">
+      <div className="flex items-center justify-center gap-1.5">
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#0f3a26]/55">{label}</span>
+      </div>
+      <p className="mt-1 text-[18px] font-bold leading-none tabular-nums text-[#0f3a26]">{grams}<span className="ml-0.5 text-[11px] font-medium text-[#0f3a26]/45">g</span></p>
     </div>
   );
 }

@@ -4,10 +4,12 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
+
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 import type { PendingOrder } from "@/lib/booking/order";
 import type { PolicyOption, ProPlan } from "@/lib/plans/types";
@@ -47,22 +49,26 @@ const LS_INSURANCE = "suppai.activeInsurance";
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null);
   const [navigateTo, setNavigateTo] = useState<string | null>(null);
-  const [currentTier, setTier] = useState<TierId>("free");
-  const [activeInsurance, setInsurance] = useState<ActiveInsurance | null>(null);
-
-  // Hydrate persisted state on mount (avoids SSR hydration mismatch).
-  useEffect(() => {
+  // Persisted state is read once the client has hydrated (no SSR mismatch);
+  // choices made in this session override what storage held.
+  const hydrated = useHydrated();
+  const stored = useMemo(() => {
+    const out: { tier: TierId; insurance: ActiveInsurance | null } = { tier: "free", insurance: null };
+    if (!hydrated) return out;
     try {
       const t = localStorage.getItem(LS_TIER);
-      if (t === "daily" || t === "weekly" || t === "free") {
-        setTier(t);
-      }
+      if (t === "daily" || t === "weekly" || t === "free") out.tier = t;
       const i = localStorage.getItem(LS_INSURANCE);
-      if (i) setInsurance(JSON.parse(i) as ActiveInsurance);
+      if (i) out.insurance = JSON.parse(i) as ActiveInsurance;
     } catch {
       /* ignore */
     }
-  }, []);
+    return out;
+  }, [hydrated]);
+  const [tierChoice, setTier] = useState<TierId | null>(null);
+  const [insuranceChoice, setInsurance] = useState<ActiveInsurance | null | undefined>(undefined);
+  const currentTier = tierChoice ?? stored.tier;
+  const activeInsurance = insuranceChoice !== undefined ? insuranceChoice : stored.insurance;
 
   const setCurrentTier = useCallback((t: TierId) => {
     setTier(t);

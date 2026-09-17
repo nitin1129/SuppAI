@@ -10,12 +10,14 @@ import {
   Crown,
   Gift,
   Heart,
+  LifeBuoy,
   Loader2,
   Mail,
   MapPin,
   Pencil,
   Phone,
   Plus,
+  RotateCcw,
   Stethoscope,
   TestTube,
   Trash2,
@@ -23,7 +25,9 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+
+import { ActivityBlock, SectionHead } from "@/components/dashboard/HubBlocks";
 
 import { useWishlist } from "@/lib/cart/WishlistContext";
 import type { WishlistItem } from "@/lib/cart/types";
@@ -47,6 +51,7 @@ import {
   setDefaultAddress,
 } from "@/lib/account/service";
 import { fetchSubscriptions } from "@/lib/subscriptions/service";
+import { fetchRefunds, fetchTickets, type RefundRequest, type Ticket } from "@/lib/support/service";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const CARD = "rounded-3xl bg-white shadow-[0_2px_4px_-2px_rgba(15,58,38,0.08),0_16px_36px_-20px_rgba(15,58,38,0.30)] ring-1 ring-[#0f3a26]/10";
@@ -57,6 +62,8 @@ export function AccountView() {
   const [wallet, setWallet] = useState<WalletType | null>(null);
   const [payments, setPayments] = useState<Payment[] | null>(null);
   const [subCount, setSubCount] = useState(0);
+  const [tickets, setTickets] = useState<Ticket[] | null>(null);
+  const [refunds, setRefunds] = useState<RefundRequest[] | null>(null);
   const { items: wishItems } = useWishlist();
 
   useEffect(() => {
@@ -65,10 +72,25 @@ export function AccountView() {
     fetchWallet().then(setWallet);
     fetchPayments().then(setPayments);
     fetchSubscriptions().then((s) => setSubCount(s.length));
+    fetchTickets().then(setTickets);
+    fetchRefunds().then(setRefunds);
   }, []);
 
+  const help = useMemo(() => {
+    if (!tickets || !refunds) return null;
+    const active = tickets.filter((t) => t.status !== "resolved" && t.status !== "closed");
+    const waiting = active.filter((t) => t.status === "awaiting_you").length;
+    const moving = refunds.filter((r) => r.status === "requested" || r.status === "approved" || r.status === "processing");
+    return {
+      open: active.length,
+      waiting,
+      refunds: moving.length,
+      refundTotal: moving.reduce((sum, r) => sum + r.amount, 0),
+    };
+  }, [tickets, refunds]);
+
   return (
-    <div className="grid grid-cols-12 items-stretch gap-6 px-6 py-6 md:px-10">
+    <div className="grid grid-cols-12 items-stretch gap-4 px-4 py-5 md:gap-6 md:px-10 md:py-6">
       <Rise i={0} className="col-span-12 lg:col-span-8">
         <AccountDetails profile={profile} onSaveProfile={setProfile} addresses={addresses} onChangeAddresses={setAddresses} />
       </Rise>
@@ -83,7 +105,32 @@ export function AccountView() {
         <WishlistTile items={wishItems} />
       </Rise>
 
+      {/* Help & Support, folded in from its own nav item */}
       <Rise i={4} className="col-span-12">
+        <SectionHead label="Help & Support" title="Tickets and refunds" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+          <ActivityBlock
+            href="/dashboard/support#tickets"
+            icon={LifeBuoy}
+            label="Support tickets"
+            value={help ? String(help.open) : null}
+            unit="open"
+            detail={help ? (help.waiting > 0 ? help.waiting + (help.waiting === 1 ? " needs your reply" : " need your reply") : help.open > 0 ? "Our care team is on it" : "No open tickets") : ""}
+            cta="Get help"
+          />
+          <ActivityBlock
+            href="/dashboard/support#refunds"
+            icon={RotateCcw}
+            label="Refunds"
+            value={help ? String(help.refunds) : null}
+            unit="in progress"
+            detail={help ? (help.refunds > 0 ? "₹" + help.refundTotal.toLocaleString("en-IN") + " on its way back to you" : "Nothing pending") : ""}
+            cta="View refunds"
+          />
+        </div>
+      </Rise>
+
+      <Rise i={5} className="col-span-12">
         <PaymentsCard payments={payments} />
       </Rise>
     </div>
@@ -129,9 +176,12 @@ function AccountDetails({
   const [addr, setAddr] = useState<typeof EMPTY_ADDR & { id?: string }>(EMPTY_ADDR);
   const [addrBusy, setAddrBusy] = useState(false);
 
-  useEffect(() => {
-    if (profile) setForm(profile);
-  }, [profile]);
+  // Take a fresh editable copy whenever a new profile arrives.
+  const [syncedProfile, setSyncedProfile] = useState<Profile | null>(null);
+  if (profile && profile !== syncedProfile) {
+    setSyncedProfile(profile);
+    setForm(profile);
+  }
 
   if (!profile || !form) return <div className={`h-72 animate-pulse ${CARD}`} />;
 
@@ -274,13 +324,16 @@ function ContactCell({
 
 /* ============================== Membership tile ============================== */
 
+const noopSubscribe = () => () => {};
+function renewalDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
 function MembershipTile({ plan, subscriptions }: { plan: string; subscriptions: number }) {
-  const [renewal, setRenewal] = useState<string | null>(null);
-  useEffect(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    setRenewal(d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }));
-  }, []);
+  // Client-only value: the server snapshot is null, so hydration matches and the date fills in after.
+  const renewal = useSyncExternalStore(noopSubscribe, renewalDate, () => null);
 
   const rows = [
     { label: "Next renewal", value: renewal ?? "In 7 days" },
@@ -506,7 +559,7 @@ function WishlistTile({ items }: { items: WishlistItem[] }) {
       ) : (
         <>
           <div className="flex flex-1 flex-col justify-center py-4">
-            <p className="text-[40px] font-bold leading-none tabular-nums text-[#0f3a26]">{count}</p>
+            <p className="text-[30px] font-bold leading-none tabular-nums text-[#0f3a26] sm:text-[40px]">{count}</p>
             <p className="mt-1.5 text-[13px] font-semibold text-[#0f3a26]">Saved item{count === 1 ? "" : "s"}</p>
             <p className="mt-0.5 text-[11.5px] text-[#0f3a26]/55">{breakdown}</p>
           </div>

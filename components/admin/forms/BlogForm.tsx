@@ -407,6 +407,7 @@ export function BlogForm({ initial }: Props) {
             </FieldGroup>
             {form.coverImage && (
               <div className="mt-4 overflow-hidden rounded-xl bg-[#0f3a26]/[0.04] ring-1 ring-inset ring-[#0f3a26]/8">
+                {/* eslint-disable-next-line @next/next/no-img-element -- previews an arbitrary URL or uploaded blob, which next/image cannot load */}
                 <img
                   src={form.coverImage}
                   alt="Cover preview"
@@ -918,6 +919,7 @@ function OgPreview({
     <div className="overflow-hidden rounded-lg ring-1 ring-inset ring-[#0f3a26]/8">
       <div className="relative aspect-[1200/630] bg-[#0f3a26]/[0.04]">
         {image ? (
+          // eslint-disable-next-line @next/next/no-img-element -- previews an arbitrary URL or uploaded blob, which next/image cannot load
           <img
             src={image}
             alt="OG preview"

@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   AlertCircle,
+  ArrowLeft,
   ArrowUpRight,
   Bug,
   Check,
@@ -26,6 +27,7 @@ import {
   Ticket as TicketIcon,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { relTime } from "@/lib/account/service";
@@ -79,7 +81,15 @@ export function SupportView() {
   }, []);
 
   return (
-    <div className="grid grid-cols-12 items-stretch gap-6 px-6 py-6 md:px-10">
+    <div className="grid grid-cols-12 items-stretch gap-4 px-4 py-5 md:gap-6 md:px-10 md:py-6">
+      <Link
+        href="/dashboard/account"
+        className="col-span-12 -mb-1 inline-flex w-fit items-center gap-1.5 text-[12.5px] font-medium text-[#0f3a26]/55 transition hover:text-[#006E42]"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Account &amp; Support
+      </Link>
+
       <Rise i={0} className="col-span-12 xl:col-span-8">
         <TicketComposer
           onCreated={(list, newId) => {
@@ -93,10 +103,14 @@ export function SupportView() {
       </Rise>
 
       <Rise i={2} className="col-span-12 xl:col-span-8">
+        <div id="tickets" className="h-full scroll-mt-24">
         <TicketsPanel tickets={tickets} expandedId={expandedId} setExpandedId={setExpandedId} onUpdate={setTickets} />
+        </div>
       </Rise>
       <Rise i={3} className="col-span-12 xl:col-span-4">
-        <RefundsPanel refunds={refunds} />
+        <div id="refunds" className="h-full scroll-mt-24">
+          <RefundsPanel refunds={refunds} />
+        </div>
       </Rise>
 
       <Rise i={4} className="col-span-12">

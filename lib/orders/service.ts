@@ -11,7 +11,7 @@ import type {
   TestStatus,
 } from "./types";
 
-const LS_KEY = "suppai.orders.v2";
+const LS_KEY = "suppai.orders.v5";
 const DELAY = 180;
 const delay = <T,>(v: T, ms = DELAY): Promise<T> =>
   new Promise((r) => setTimeout(() => r(v), ms));
@@ -275,6 +275,23 @@ function seed(): OrderRecord[] {
         qualifications: "MBBS, MD, DM", experienceYears: 14, rating: 4.8, reviewCount: 320,
         languages: ["English", "Hindi"], bio: "", fee: 600, clinic: "Apollo Clinic",
         modes: ["video", "in-clinic"], nextAvailable: "", reviews: [],
+      },
+    },
+    {
+      id: "seed-consult-5",
+      reference: "SA-DOC-2214",
+      kind: "consult",
+      placedAt: new Date(now - 1 * day).toISOString(),
+      total: 749,
+      status: "upcoming",
+      mode: "in-clinic",
+      patient,
+      schedule: { date: new Date(now + 5 * day).toISOString().slice(0, 10), slotId: "s5", slotLabel: "16:00 - 16:30" },
+      doctor: {
+        id: "doc-4", name: "Dr. Arjun Menon", specialtyId: "gastro", specialtyLabel: "Gastroenterologist",
+        qualifications: "MBBS, MD, DM", experienceYears: 17, rating: 4.9, reviewCount: 412,
+        languages: ["English", "Malayalam"], bio: "", fee: 700, clinic: "Fortis Heart Institute",
+        modes: ["in-clinic", "video"], nextAvailable: "", reviews: [],
       },
     },
     {

@@ -163,7 +163,7 @@ export function InsuranceFlow({ onExit }: Props) {
   const isDone = step === 6;
 
   return (
-    <div className="flex h-full flex-col px-10 pb-4 pt-2">
+    <div className="flex h-full flex-col px-4 pb-4 pt-2 md:px-10">
       <div className="shrink-0">
         <button
           onClick={onExit}
@@ -563,7 +563,7 @@ function StepPreferences({
         </p>
 
         <div className="mt-6 flex items-baseline gap-2">
-          <span className="text-[44px] font-bold leading-none tabular-nums text-[#0f3a26]">
+          <span className="text-[32px] font-bold leading-none tabular-nums text-[#0f3a26] sm:text-[44px]">
             ₹{prefs.yearlyBudget.toLocaleString()}
           </span>
           <span className="text-[13px] text-[#0f3a26]/55">/ year</span>
@@ -987,7 +987,7 @@ function StepDone({
         <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#006E42]/10 text-[#006E42]">
           <CheckCircle2 className="h-8 w-8" />
         </span>
-        <h2 className="mt-6 text-[28px] font-semibold tracking-tight text-[#0f3a26]">
+        <h2 className="mt-6 text-[23px] font-semibold tracking-tight text-[#0f3a26] sm:text-[28px]">
           We&apos;re on it
         </h2>
         <p className="mt-2 text-[14px] leading-relaxed text-[#0f3a26]/65">

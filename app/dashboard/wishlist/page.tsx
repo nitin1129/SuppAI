@@ -33,7 +33,7 @@ export default function WishlistPage() {
 
   if (!hydrated) {
     return (
-      <div className="px-10 py-8">
+      <div className="px-4 py-6 md:px-10 md:py-8">
         <div className="h-72 animate-pulse rounded-3xl bg-white ring-1 ring-[#0f3a26]/8" />
       </div>
     );
@@ -44,7 +44,7 @@ export default function WishlistPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-10 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-6 md:px-10 md:py-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#006E42]">
@@ -251,7 +251,7 @@ function RemoveBtn({ onClick }: { onClick: () => void }) {
 
 function EmptyWishlist() {
   return (
-    <div className="mx-auto max-w-3xl px-10 py-16">
+    <div className="mx-auto max-w-3xl px-5 py-12 md:px-10 md:py-16">
       <div className="flex items-start gap-5">
         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#006E42]/10 text-[#006E42]">
           <Heart className="h-6 w-6" />
