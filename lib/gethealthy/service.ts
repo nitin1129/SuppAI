@@ -88,6 +88,8 @@ export type DayBlock = {
   detail: string;
   kcal?: number;
   custom?: boolean;
+  /** Set on blocks that came from a generated meal plan. */
+  source?: "meal-plan";
 };
 
 export const DAY_PLAN: DayBlock[] = [
@@ -120,6 +122,20 @@ export async function addDayBlock(b: Omit<DayBlock, "id" | "custom">): Promise<D
   writeLocal(LS_DAY, next);
   return delay(next, 200);
 }
+/** Puts a generated meal plan on the schedule. The plan's meals replace the
+    starter meals and any earlier plan, while blocks the person added stay. */
+export async function applyPlanBlocks(incoming: Omit<DayBlock, "id" | "custom" | "source">[]): Promise<DayBlock[]> {
+  const kept = readLocal(LS_DAY, DAY_PLAN).filter((b) => {
+    if (b.source === "meal-plan") return false;
+    const starterMeal = !b.custom && (b.type === "meal" || b.type === "snack");
+    return !starterMeal;
+  });
+  const created: DayBlock[] = incoming.map((b) => ({ ...b, id: uid("mp"), source: "meal-plan" }));
+  const next = [...kept, ...created].sort(byTime);
+  writeLocal(LS_DAY, next);
+  return delay(next, 200);
+}
+
 export async function removeDayBlock(id: string): Promise<DayBlock[]> {
   const next = readLocal(LS_DAY, DAY_PLAN).filter((b) => b.id !== id);
   writeLocal(LS_DAY, next);

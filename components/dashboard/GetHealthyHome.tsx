@@ -39,6 +39,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { HealthTools } from "@/components/dashboard/HealthTools";
+import { MealPlanBuilder } from "@/components/dashboard/MealPlanBuilder";
 import {
   DAY_CALORIE_TARGET,
   WEEK_PLAN,
@@ -49,6 +50,7 @@ import {
   type RoutineItem,
   activatePlan,
   addDayBlock,
+  applyPlanBlocks,
   addRoutineItem,
   fetchAchievements,
   fetchDayBlocks,
@@ -63,6 +65,8 @@ import {
 } from "@/lib/gethealthy/service";
 import { matchFood, parseCount, parseGrams } from "@/lib/gethealthy/foods";
 import { DIETS, DIET_META, fetchMeals, youtubeId, type Diet, type Meal } from "@/lib/meals/service";
+import { planDayToBlocks } from "@/lib/gethealthy/from-meal-plan";
+import type { PlanSection, PlannedDay } from "@/lib/meals/plan-text";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const CARD = "rounded-3xl bg-white shadow-[0_2px_4px_-2px_rgba(15,58,38,0.08),0_16px_36px_-20px_rgba(15,58,38,0.30)] ring-1 ring-[#0f3a26]/10";
@@ -143,7 +147,12 @@ function buildWeekHtml(routine: RoutineItem[]) {
 
 /* ============================================================= ROOT ======= */
 
-type AddInit = { mode: "today" | "routine"; day: string };
+type AddInit = { mode: "today" | "routine"; day: string; time?: string };
+
+function nowHHMM() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
 
 export function GetHealthyHome() {
   const [state, setState] = useState<PlanState | null>(null);
@@ -177,17 +186,26 @@ export function GetHealthyHome() {
     setProc({ active: false, step: 0 });
   }
 
+  /* A generated plan lands on the schedule in short form (dish, time, key
+     numbers), grouped under Morning, Afternoon and Evening like everything else. */
+  async function useMealPlanDay(day: PlannedDay, sections: PlanSection[]) {
+    if (state?.status !== "active") setState(await activatePlan("your meal plan"));
+    setBlocks(await applyPlanBlocks(planDayToBlocks(day, sections)));
+    window.setTimeout(() => document.getElementById("today-schedule")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }), 120);
+  }
+
   const browse = () => fileRef.current?.click();
   const active = state?.status === "active" && !proc.active;
 
   return (
-    <div className="px-6 py-6 md:px-10">
+    <div className="px-4 py-5 md:px-10 md:py-6">
       <input ref={fileRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) runProcessing(f.name); }} />
 
       {proc.active ? (
         <Fade><ProcessingCard step={proc.step} /></Fade>
       ) : active ? (
         <ActivePlan
+          onUseMealPlanDay={useMealPlanDay}
           state={state!}
           doneIds={doneIds}
           blocks={blocks}
@@ -198,14 +216,14 @@ export function GetHealthyHome() {
           onRemoveRoutine={async (id) => setRoutine(await removeRoutineItem(id))}
           onEditMeal={(b) => setEditMeal(b)}
           onOpenRecipe={setRecipe}
-          onAdd={(init) => setAdd(init)}
+          onAdd={(init) => setAdd({ ...init, time: nowHHMM() })}
           onBrowse={browse}
           onReset={async () => { setState(await resetPlan()); setDoneIds([]); setBlocks(await fetchDayBlocks()); setRoutine([]); }}
           onDownloadDay={() => printDoc("SuppAI Daily plan", buildDayHtml(blocks, doneIds))}
           onDownloadWeek={() => printDoc("SuppAI Weekly plan", buildWeekHtml(routine))}
         />
       ) : (
-        <EmptyPlan onBrowse={browse} onFile={(f) => { if (f) runProcessing(f.name); }} onSample={() => runProcessing("blood-report-jane.pdf")} onOpenRecipe={setRecipe} />
+        <EmptyPlan onUseMealPlanDay={useMealPlanDay} onBrowse={browse} onFile={(f) => { if (f) runProcessing(f.name); }} onSample={() => runProcessing("blood-report-jane.pdf")} onOpenRecipe={setRecipe} />
       )}
 
       <RecipeModal recipe={recipe} onClose={() => setRecipe(null)} onLog={async (r) => { setBlocks(await addDayBlock({ time: "", type: "meal", title: r.name, detail: "From recipes", kcal: r.kcal })); setRecipe(null); }} canLog={active} />
@@ -251,13 +269,15 @@ function Heading({ label, title, locked, action }: { label: string; title: strin
 
 /* ============================================================= EMPTY ====== */
 
-function EmptyPlan({ onBrowse, onFile, onSample, onOpenRecipe }: { onBrowse: () => void; onFile: (f?: File | null) => void; onSample: () => void; onOpenRecipe: (r: Meal) => void }) {
+function EmptyPlan({ onUseMealPlanDay, onBrowse, onFile, onSample, onOpenRecipe }: { onUseMealPlanDay: (day: PlannedDay, sections: PlanSection[]) => Promise<void>; onBrowse: () => void; onFile: (f?: File | null) => void; onSample: () => void; onOpenRecipe: (r: Meal) => void }) {
   return (
-    <div className="space-y-8">
-      <Stagger i={0}><UploadSpotlight onBrowse={onBrowse} onFile={onFile} onSample={onSample} /></Stagger>
-      <Stagger i={1}><HealthTools /></Stagger>
+    <div className="space-y-6 md:space-y-8">
+      <Stagger i={0}><HealthTools /></Stagger>
+      <Stagger i={1}><UploadSpotlight onBrowse={onBrowse} onFile={onFile} onSample={onSample} /></Stagger>
 
-      <Stagger i={2}>
+      <Stagger i={2}><MealPlanBuilder onUseDay={onUseMealPlanDay} /></Stagger>
+
+      <Stagger i={3}>
         <Heading label="Eat well" title="Recipes for you" action={<span className="text-[11px] text-[#0f3a26]/40">scroll for more</span>} />
         <RecipeRail onOpen={onOpenRecipe} />
       </Stagger>
@@ -345,13 +365,14 @@ function ProcessingCard({ step }: { step: number }) {
 /* ============================================================== ACTIVE ==== */
 
 function ActivePlan(props: {
+  onUseMealPlanDay: (day: PlannedDay, sections: PlanSection[]) => Promise<void>;
   state: PlanState; doneIds: string[]; blocks: DayBlock[]; routine: RoutineItem[]; ach: Achievements | null;
   onToggle: (id: string) => void; onRemoveBlock: (id: string) => void; onRemoveRoutine: (id: string) => void;
   onEditMeal: (b: DayBlock) => void;
   onOpenRecipe: (r: Meal) => void; onAdd: (init: AddInit) => void; onBrowse: () => void; onReset: () => void;
   onDownloadDay: () => void; onDownloadWeek: () => void;
 }) {
-  const { state, doneIds, blocks, routine, ach, onToggle, onRemoveBlock, onRemoveRoutine, onEditMeal, onOpenRecipe, onAdd, onBrowse, onReset, onDownloadDay, onDownloadWeek } = props;
+  const { onUseMealPlanDay, state, doneIds, blocks, routine, ach, onToggle, onRemoveBlock, onRemoveRoutine, onEditMeal, onOpenRecipe, onAdd, onBrowse, onReset, onDownloadDay, onDownloadWeek } = props;
   const todayKey = WEEK_PLAN[Math.min(Math.max(state.day - 1, 0), WEEK_PLAN.length - 1)].key;
   const doneCount = blocks.filter((b) => doneIds.includes(b.id)).length;
 
@@ -359,11 +380,13 @@ function ActivePlan(props: {
     <div className="space-y-6">
       <Stagger i={0}><ActiveHeader state={state} onAdd={() => onAdd({ mode: "today", day: todayKey })} onBrowse={onBrowse} onReset={onReset} /></Stagger>
 
-      <Stagger i={1}>
-        <div className="grid grid-cols-12 items-start gap-6">
+      <Stagger i={1}><HealthTools /></Stagger>
+
+      <Stagger i={2}>
+        <div className="grid grid-cols-12 items-start gap-4 md:gap-6">
           {/* left: editable day timeline */}
           <div className="col-span-12 xl:col-span-8">
-            <div className={`${CARD} p-5 md:p-6`}>
+            <div id="today-schedule" className={`${CARD} scroll-mt-4 p-5 md:p-6`}>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-baseline gap-2">
                   <h2 className="text-[15px] font-bold tracking-tight text-[#0f3a26]">Today</h2>
@@ -380,16 +403,16 @@ function ActivePlan(props: {
           </div>
 
           {/* right rail: compact insight + weekly plan */}
-          <aside className="col-span-12 space-y-6 xl:col-span-4">
+          <aside className="col-span-12 space-y-4 md:space-y-6 xl:col-span-4">
             <InsightCard blocks={blocks} doneIds={doneIds} ach={ach} />
             <WeeklyPlanCard today={state.day} routine={routine} onAddRoutine={(day) => onAdd({ mode: "routine", day })} onRemoveRoutine={onRemoveRoutine} onDownload={onDownloadWeek} />
           </aside>
         </div>
       </Stagger>
 
-      <Stagger i={2}><HealthTools /></Stagger>
+      <Stagger i={3}><MealPlanBuilder onUseDay={onUseMealPlanDay} /></Stagger>
 
-      <Stagger i={3}>
+      <Stagger i={4}>
         <Heading label="Eat well" title="Recipes for you" action={<span className="text-[11px] text-[#0f3a26]/40">scroll for more</span>} />
         <RecipeRail onOpen={onOpenRecipe} />
       </Stagger>
@@ -458,15 +481,15 @@ function BlockRow({ b, done, onToggle, onRemove, onEdit, reduce }: { b: DayBlock
   const editable = b.type === "meal" || b.type === "snack";
   return (
     <motion.li layout initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.28, ease: EASE }} className="flex items-center gap-2">
-      <div onClick={() => onToggle(b.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(b.id); } }} className={`flex flex-1 cursor-pointer items-center gap-3 rounded-2xl p-3 text-left ring-1 ring-inset transition ${done ? "bg-[#006E42]/[0.05] ring-[#006E42]/15" : "bg-[#f1f7f3] ring-[#0f3a26]/[0.08] hover:ring-[#006E42]/25 hover:shadow-[0_6px_16px_-10px_rgba(15,58,38,0.28)]"}`}>
-        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-colors ${done ? "bg-[#006E42] text-white" : meta.tint}`}>{done ? <Check className="h-4 w-4" /> : <meta.icon className="h-4 w-4" />}</span>
+      <div onClick={() => onToggle(b.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(b.id); } }} className={`flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-2xl p-3 text-left ring-1 ring-inset transition ${done ? "bg-[#006E42]/[0.05] ring-[#006E42]/15" : "bg-[#f1f7f3] ring-[#0f3a26]/[0.08] hover:ring-[#006E42]/25 hover:shadow-[0_6px_16px_-10px_rgba(15,58,38,0.28)]"}`}>
+        <span className={`hidden h-9 w-9 shrink-0 place-items-center rounded-xl transition-colors sm:grid ${done ? "bg-[#006E42] text-white" : meta.tint}`}>{done ? <Check className="h-4 w-4" /> : <meta.icon className="h-4 w-4" />}</span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
             <span className={`shrink-0 text-[11px] font-bold tabular-nums ${done ? "text-[#0f3a26]/40" : "text-[#006E42]"}`}>{b.time || "Anytime"}</span>
-            <span className={`truncate text-[13px] font-semibold ${done ? "text-[#0f3a26]/50 line-through" : "text-[#0f3a26]"}`}>{b.title}</span>
+            <span className={`min-w-0 line-clamp-2 text-[13px] font-semibold leading-snug sm:truncate ${done ? "text-[#0f3a26]/50 line-through" : "text-[#0f3a26]"}`}>{b.title}</span>
             {b.custom && <span className="shrink-0 rounded-full bg-[#c79a3d]/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#9c7426]">added</span>}
           </div>
-          <p className="mt-0.5 truncate text-[11px] text-[#0f3a26]/55">{b.detail || TYPE_LABEL[b.type]}{b.kcal ? ` · ${b.kcal} kcal` : ""}</p>
+          <p className="mt-0.5 line-clamp-2 text-[11px] text-[#0f3a26]/55 sm:truncate">{b.detail || TYPE_LABEL[b.type]}{b.kcal ? ` · ${b.kcal} kcal` : ""}</p>
         </div>
         {editable && <button onClick={(e) => { e.stopPropagation(); onEdit(b); }} aria-label="Adjust meal" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[#0f3a26]/40 ring-1 ring-inset ring-[#0f3a26]/12 transition hover:bg-white hover:text-[#006E42] hover:ring-[#006E42]/35"><Pencil className="h-4 w-4" /></button>}
       </div>
@@ -488,7 +511,7 @@ function DaySummaryFooter({ blocks }: { blocks: DayBlock[] }) {
     { icon: Flame, value: kcal.toLocaleString(), label: "kcal planned" },
   ];
   return (
-    <div className="mt-5 grid grid-cols-3 gap-3 border-t border-[#0f3a26]/8 pt-5">
+    <div className="mt-5 grid grid-cols-3 gap-2 border-t border-[#0f3a26]/8 pt-5 sm:gap-3">
       {tiles.map((t) => (
         <div key={t.label} className="rounded-2xl bg-[#f1f7f3] p-3 text-center ring-1 ring-inset ring-[#0f3a26]/[0.08]">
           <t.icon className="mx-auto h-4 w-4 text-[#006E42]" />
@@ -770,10 +793,10 @@ function RecipeRail({ onOpen }: { onOpen: (r: Meal) => void }) {
 
 function RecipeModal({ recipe, onClose, onLog, canLog }: { recipe: Meal | null; onClose: () => void; onLog: (r: Meal) => void; canLog: boolean }) {
   const reduce = useReducedMotion();
-  const [showVideo, setShowVideo] = useState(false);
+  const [videoFor, setVideoFor] = useState<Meal | null>(null);
+  const showVideo = videoFor !== null && videoFor === recipe;
   useEffect(() => {
     if (!recipe) return;
-    setShowVideo(false);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
@@ -792,7 +815,7 @@ function RecipeModal({ recipe, onClose, onLog, canLog }: { recipe: Meal | null; 
             {showVideo && vid ? (
               <div className="relative aspect-video w-full shrink-0 bg-black">
                 <iframe src={`https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&rel=0`} title={recipe.name} className="h-full w-full" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
-                <button onClick={() => setShowVideo(false)} aria-label="Back to photo" className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg bg-white/85 text-[#0f3a26] backdrop-blur transition hover:bg-white"><X className="h-4 w-4" /></button>
+                <button onClick={() => setVideoFor(null)} aria-label="Back to photo" className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg bg-white/85 text-[#0f3a26] backdrop-blur transition hover:bg-white"><X className="h-4 w-4" /></button>
               </div>
             ) : (
               <div className="relative h-44 shrink-0">
@@ -800,7 +823,7 @@ function RecipeModal({ recipe, onClose, onLog, canLog }: { recipe: Meal | null; 
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0f3a26]/70 to-transparent" />
                 <button onClick={onClose} aria-label="Close" className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg bg-white/85 text-[#0f3a26] backdrop-blur transition hover:bg-white"><X className="h-4 w-4" /></button>
                 {vid && (
-                  <button onClick={() => setShowVideo(true)} aria-label="Play recipe video" className="absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-[12.5px] font-semibold text-[#0f3a26] shadow-lg backdrop-blur transition hover:bg-white">
+                  <button onClick={() => setVideoFor(recipe)} aria-label="Play recipe video" className="absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-[12.5px] font-semibold text-[#0f3a26] shadow-lg backdrop-blur transition hover:bg-white">
                     <span className="grid h-6 w-6 place-items-center rounded-full bg-[#006E42] text-white"><Play className="h-3 w-3 translate-x-[1px] fill-current" /></span>
                     Watch recipe
                   </button>
@@ -825,7 +848,7 @@ function RecipeModal({ recipe, onClose, onLog, canLog }: { recipe: Meal | null; 
               {recipe.description && <p className="mt-4 text-[13px] leading-relaxed text-[#0f3a26]/70">{recipe.description}</p>}
 
               {vid && !showVideo && (
-                <button onClick={() => setShowVideo(true)} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#c14040]/8 px-3.5 py-2 text-[12.5px] font-semibold text-[#c14040] transition hover:bg-[#c14040]/12"><Film className="h-3.5 w-3.5" />Watch the recipe video</button>
+                <button onClick={() => setVideoFor(recipe)} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#c14040]/8 px-3.5 py-2 text-[12.5px] font-semibold text-[#c14040] transition hover:bg-[#c14040]/12"><Film className="h-3.5 w-3.5" />Watch the recipe video</button>
               )}
 
               <div className="mt-5">
@@ -873,11 +896,15 @@ function AddEventModal({ init, onClose, onAddDay, onAddRoutine }: { init: AddIni
   const [kcal, setKcal] = useState("");
   const [days, setDays] = useState<string[]>([]);
 
+  // Reset the form each time the modal is opened with a new request.
+  const [seenInit, setSeenInit] = useState<AddInit | null>(null);
+  if (init && init !== seenInit) {
+    setSeenInit(init);
+    setMode(init.mode); setDays([init.day]); setType("food"); setTitle(""); setTime(init.time ?? ""); setKcal("");
+  }
+
   useEffect(() => {
     if (!init) return;
-    const now = new Date();
-    const nowHHMM = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    setMode(init.mode); setDays([init.day]); setType("food"); setTitle(""); setTime(nowHHMM); setKcal("");
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1052,11 +1079,17 @@ function MealEditor({ block, onClose, onSave }: { block: DayBlock | null; onClos
 
   const info = useMemo(() => (block ? analyzeMeal(block) : null), [block]);
 
-  useEffect(() => {
-    if (!block) return;
+  // Start each opened meal fresh.
+  const [seenBlock, setSeenBlock] = useState<DayBlock | null>(null);
+  if (block && block !== seenBlock) {
+    setSeenBlock(block);
     setTab("modify");
     setFilter("all");
     setAmount(analyzeMeal(block).base);
+  }
+
+  useEffect(() => {
+    if (!block) return;
     fetchMeals().then(setMeals);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
